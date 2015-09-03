@@ -157,6 +157,22 @@ enum TalentTree // talent tabs
     TALENT_TREE_DRUID_RESTORATION    = 748
 };
 
+uint32 const pandarenLanguageSpellsAlliance[] =
+{
+    668,    // Common
+    143368, // Pandaren, Common
+    108130  // Pandaren Alliance
+};
+
+uint32 const pandarenLanguageSpellsHorde[] =
+{
+    669,    // Orcish
+    143369, // Pandaren, Orcish.
+    108131  // Pandaren Horde
+};
+
+#define PANDAREN_FACTION_LANGUAGE_COUNT 3
+
 // Spell modifier (used for modify other spells)
 struct SpellModifier
 {
@@ -1206,6 +1222,7 @@ struct PlayerTalentInfo
         PlayerTalentMap* Talents;
         uint32 Glyphs[MAX_GLYPH_SLOT_INDEX];
         uint32 TalentTree;
+        uint32 SpecializationId;
     } SpecInfo[MAX_TALENT_SPECS];
 
     uint32 UsedTalentCount;
@@ -1220,6 +1237,36 @@ private:
     PlayerTalentInfo(PlayerTalentInfo const&);
 };
 
+//const uint32 ResearchContinents[RESEARCH_CONTINENT_COUNT] = { 0, 1, 530, 571, 870}; // Eastern Kingdoms, Kalimdor, Outland, Northrend, Pandaria
+//
+//struct ResearchDigsite
+//{
+//    ResearchDigsite(ResearchDigsiteInfo const* digsiteInfo, uint8 remainingFindCount) : _digsiteInfo(digsiteInfo), _archaeologyFind(NULL), _remainingFindCount(remainingFindCount) { }
+//
+//    void SelectNewArchaeologyFind(bool onInit);
+//    void ChangeArchaeologyFind(ArchaeologyFindInfo const* find) { _archaeologyFind = find; }
+//    ArchaeologyFindInfo const* GetArchaeologyFind() { return _archaeologyFind; }
+//    bool IsEmptyDigsite() { return !_remainingFindCount; }
+//
+//    uint32 GetDigsiteId() { return _digsiteInfo->digsiteId; }
+//    ResearchDigsiteInfo const* GetDigsiteInfo() { return _digsiteInfo; }
+//    uint8 GetRemainingFindCount() { return _remainingFindCount; }
+//
+//private:
+//    ResearchDigsiteInfo const* _digsiteInfo;
+//    ArchaeologyFindInfo const* _archaeologyFind;
+//    uint8 _remainingFindCount;
+//};
+//
+//struct ResearchProjectHistory
+//{
+//    uint32 researchCount;
+//    uint32 firstResearchTimestamp;
+//};
+//
+//typedef UNORDERED_MAP<uint32 /*projectId*/, ResearchProjectHistory> ResearchHistoryMap;
+//typedef UNORDERED_MAP<uint32 /*branchId*/, uint32 /*projectId*/> ResearchProjectMap;
+
 class Player : public Unit, public GridObject<Player>
 {
     friend class WorldSession;
@@ -1228,6 +1275,8 @@ class Player : public Unit, public GridObject<Player>
     public:
         explicit Player(WorldSession* session);
         ~Player();
+
+        virtual void InitializeDynamicUpdateFields();
 
         void CleanupsBeforeDelete(bool finalCleanup = true);
 
@@ -1684,7 +1733,7 @@ class Player : public Unit, public GridObject<Player>
         bool m_mailsUpdated;
 
         void SetBindPoint(uint64 guid);
-        void SendTalentWipeConfirm(ObjectGuid guid, bool resetType);
+        void SendTalentWipeConfirm(uint64 guid, bool specialization);
         void ResetPetTalents();
         void CalcRage(uint32 damage, bool attacker);
         void RegenerateAll();
@@ -1795,6 +1844,9 @@ class Player : public Unit, public GridObject<Player>
         void SetActiveSpec(uint8 spec){ _talentMgr->ActiveSpec = spec; }
         uint8 GetSpecsCount() const { return _talentMgr->SpecsCount; }
         void SetSpecsCount(uint8 count) { _talentMgr->SpecsCount = count; }
+        uint32 GetSpecializationId(uint8 spec) const { return _talentMgr->SpecInfo[spec].SpecializationId; }
+        uint32 GetRoleForGroup(uint32 specializationId);
+        float GetMasterySpellCoefficient() const;
 
         bool ResetTalents(bool noCost = false, bool resetTalents = true, bool resetSpecialization = true);
         bool RemoveTalent(uint32 talentId);
@@ -1830,6 +1882,7 @@ class Player : public Unit, public GridObject<Player>
         void SetFreePrimaryProfessions(uint16 profs) { SetUInt32Value(PLAYER_FIELD_CHARACTER_POINTS, profs); }
         void InitPrimaryProfessions();
 
+        SkillStatusMap const& GetSkillStatusMap() const { return mSkillStatus; }
         PlayerSpellMap const& GetSpellMap() const { return m_spells; }
         PlayerSpellMap      & GetSpellMap()       { return m_spells; }
 
@@ -1938,6 +1991,9 @@ class Player : public Unit, public GridObject<Player>
         static uint32 GetGuildIdFromDB(uint64 guid);
         static uint8 GetRankFromDB(uint64 guid);
         int GetGuildIdInvited() { return m_GuildIdInvited; }
+        void SetLastGuildInviterGUID(uint64 guid) { m_lastGuildInviterGUID = guid; }
+        uint64 GetLastGuildInviterGUID() { return m_lastGuildInviterGUID; }
+        void SendDeclineGuildInvitation(std::string declinerName, bool autoDecline = false);
         static void RemovePetitionsAndSigns(uint64 guid, uint32 type);
 
         // Arena Team
@@ -2353,6 +2409,51 @@ class Player : public Unit, public GridObject<Player>
 
         WorldLocation GetStartPosition() const;
 
+        uint32 m_lastEclipseState;
+
+        uint8 m_free_slot = 0;
+        uint8 m_slot;
+
+        // current pet slot
+        PetSaveMode m_currentPetSlot;
+        uint32 m_petSlotUsed;
+
+        void setPetSlotUsed(PetSaveMode slot, bool used)
+        {
+            if (used)
+                m_petSlotUsed |= (1 << int32(slot));
+            else
+                m_petSlotUsed &= ~(1 << int32(slot));
+        }
+
+        // Pets slots and lists
+        uint8 GetPetSlot(){ return m_slot > 100 ? 100 : m_slot; };
+        void SetPetSlot(uint8 slot, bool imp = false, uint32 entry = 0)
+        {
+            if (getClass() == CLASS_HUNTER && slot != -1)
+                m_slot = slot;
+            else if (slot == -1)
+                m_slot = -1;
+            else if (getClass() == CLASS_MAGE)
+                m_slot = 100;
+            else if (slot = uint8(PET_SAVE_AS_CURRENT))
+                m_slot = 0;
+            else
+                m_slot = 100; // This is for Other pets, like Warlock and mage.
+
+            if (imp)
+                m_slot = 0;
+
+            m_stableSlots = m_slot;
+            if (entry > 0)
+                SetTemporaryUnsummonedPetNumber(entry);
+        };
+
+        void DataPetGuids(WorldPacket &data_guids, ByteBuffer &data_guids2, ObjectGuid guid);
+        void SendPetsInSlots(Player* owner, uint64 guid = 0, bool all = true, int64 show_num = -1);
+        void InitializePetSlots(Player* owner, uint64 guid = 0);
+
+
         // currently visible objects at player client
         typedef std::set<uint64> ClientGUIDs;
         ClientGUIDs m_clientGUIDs;
@@ -2623,7 +2724,6 @@ class Player : public Unit, public GridObject<Player>
         void _LoadFriendList(PreparedQueryResult result);
         bool _LoadHomeBind(PreparedQueryResult result);
         void _LoadDeclinedNames(PreparedQueryResult result);
-        void _LoadArenaTeamInfo(PreparedQueryResult result);
         void _LoadEquipmentSets(PreparedQueryResult result);
         void _LoadBGData(PreparedQueryResult result);
         void _LoadGlyphs(PreparedQueryResult result);
@@ -2836,6 +2936,9 @@ class Player : public Unit, public GridObject<Player>
         uint8 m_grantableLevels;
 
         CUFProfile* _CUFProfiles[MAX_CUF_PROFILES];
+
+        // Guid of player who invited player to guild as last
+        uint64 m_lastGuildInviterGUID;
 
     private:
         // internal common parts for CanStore/StoreItem functions

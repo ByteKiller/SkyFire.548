@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2011-2015 Project SkyFire <http://www.projectskyfire.org/>
  * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2015 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2014 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -30,6 +29,7 @@
 #include "ScriptMgr.h"
 #include "SocialMgr.h"
 #include "Opcodes.h"
+#include "ReputationMgr.h"
 
 #define MAX_GUILD_BANK_TAB_TEXT_LEN 500
 #define EMBLEM_PRICE 10 * GOLD
@@ -100,7 +100,7 @@ inline uint32 _GetGuildBankTabPrice(uint8 tabId)
 
 void Guild::SendCommandResult(WorldSession* session, GuildCommandType type, GuildCommandError errCode, std::string const& param)
 {
-    WorldPacket data(SMSG_GUILD_COMMAND_RESULT, 8 + param.size() + 1);
+    WorldPacket data(SMSG_GUILD_COMMAND_RESULT, 4 + 4 + 1 + param.size());
     data << uint32(type);
     data << uint32(errCode);
 
@@ -110,7 +110,8 @@ void Guild::SendCommandResult(WorldSession* session, GuildCommandType type, Guil
 
     session->SendPacket(&data);
 
-    TC_LOG_DEBUG("guild", "SMSG_GUILD_COMMAND_RESULT [%s]: Type: %u, code: %u, param: %s", session->GetPlayerInfo().c_str(), type, errCode, param.c_str());
+    TC_LOG_DEBUG("guild", "SMSG_GUILD_COMMAND_RESULT [%s]: Type: %u, code: %u, param: %s"
+         , session->GetPlayerInfo().c_str(), type, errCode, param.c_str());
 }
 
 void Guild::SendSaveEmblemResult(WorldSession* session, GuildEmblemError errCode)
@@ -203,25 +204,14 @@ void Guild::EventLogEntry::WritePacket(WorldPacket& data, ByteBuffer& content) c
     ObjectGuid guid1 = MAKE_NEW_GUID(m_playerGuid1, 0, HIGHGUID_PLAYER);
     ObjectGuid guid2 = MAKE_NEW_GUID(m_playerGuid2, 0, HIGHGUID_PLAYER);
 
-    data.WriteBit(guid1[6]);
-    data.WriteBit(guid1[4]);
-    data.WriteBit(guid2[5]);
-    data.WriteBit(guid2[1]);
-    data.WriteBit(guid2[3]);
-    data.WriteBit(guid2[0]);
-    data.WriteBit(guid2[4]);
+    data.WriteGuidMask(guid1, 6, 4);
+    data.WriteGuidMask(guid2, 5, 1, 3, 0, 4);
     data.WriteBit(guid1[4]);
     data.WriteBit(guid2[7]);
-    data.WriteBit(guid1[0]);
-    data.WriteBit(guid1[2]);
-    data.WriteBit(guid1[7]);
-    data.WriteBit(guid1[3]);
-    data.WriteBit(guid1[5]);
-    data.WriteBit(guid2[2]);
-    data.WriteBit(guid2[6]);
+    data.WriteGuidMask(guid1, 0, 2, 7, 3, 5);
+    data.WriteGuidMask(guid2, 2, 6);
 
-    content.WriteByteSeq(guid1[5]);
-    content.WriteByteSeq(guid1[4]);
+    content.WriteGuidBytes(guid1, 5, 4);
     content.WriteByteSeq(guid2[6]);
     content.WriteByteSeq(guid1[2]);
     content.WriteByteSeq(guid2[4]);
@@ -230,19 +220,15 @@ void Guild::EventLogEntry::WritePacket(WorldPacket& data, ByteBuffer& content) c
     content << uint8(m_eventType);
 
     content.WriteByteSeq(guid2[0]);
-    content.WriteByteSeq(guid1[7]);
-    content.WriteByteSeq(guid1[3]);
-    content.WriteByteSeq(guid2[5]);
-    content.WriteByteSeq(guid2[2]);
+    content.WriteGuidBytes(guid1, 7, 3);
+    content.WriteGuidBytes(guid2, 5, 2);
     content.WriteByteSeq(guid1[0]);
 
     // Event timestamp
     content << uint32(::time(NULL) - m_timestamp);
 
-    content.WriteByteSeq(guid1[1]);
-    content.WriteByteSeq(guid1[6]);
-    content.WriteByteSeq(guid2[7]);
-    content.WriteByteSeq(guid2[1]);
+    content.WriteGuidBytes(guid1, 1, 6);
+    content.WriteGuidBytes(guid2, 7, 1);
 
     // New Rank
     content << uint8(m_newRank);
@@ -288,20 +274,13 @@ void Guild::BankEventLogEntry::WritePacket(WorldPacket& data, ByteBuffer& conten
     bool hasStack = (hasItem && m_itemStackCount > 1) || itemMoved;
 
     data.WriteBit(IsMoneyEvent());
-    data.WriteBit(logGuid[0]);
-    data.WriteBit(logGuid[2]);
-    data.WriteBit(logGuid[3]);
-    data.WriteBit(logGuid[6]);
-    data.WriteBit(logGuid[5]);
-    data.WriteBit(logGuid[4]);
+    data.WriteGuidMask(logGuid, 0, 2, 3, 6, 5, 4);
     data.WriteBit(hasStack);
     data.WriteBit(hasItem);
-    data.WriteBit(logGuid[7]);
-    data.WriteBit(logGuid[1]);
+    data.WriteGuidMask(logGuid, 7, 1);
     data.WriteBit(itemMoved);
 
-    content.WriteByteSeq(logGuid[1]);
-    content.WriteByteSeq(logGuid[7]);
+    content.WriteGuidBytes(logGuid, 1, 7);
 
     if (itemMoved)
         content << uint8(m_destTabId);
@@ -309,8 +288,7 @@ void Guild::BankEventLogEntry::WritePacket(WorldPacket& data, ByteBuffer& conten
     content.WriteByteSeq(logGuid[2]);
     content << uint32(time(NULL) - m_timestamp);
     content << uint8(m_eventType);
-    content.WriteByteSeq(logGuid[0]);
-    content.WriteByteSeq(logGuid[4]);
+    content.WriteGuidBytes(logGuid, 0, 4);
 
     if (hasItem)
         content << uint32(m_itemOrMoney);
@@ -323,8 +301,7 @@ void Guild::BankEventLogEntry::WritePacket(WorldPacket& data, ByteBuffer& conten
     if (hasStack)
         content << uint32(m_itemStackCount);
 
-    content.WriteByteSeq(logGuid[5]);
-    content.WriteByteSeq(logGuid[3]);
+    content.WriteGuidBytes(logGuid, 5, 3);
 }
 
 void Guild::NewsLogEntry::SaveToDB(SQLTransaction& trans) const
@@ -347,23 +324,13 @@ void Guild::NewsLogEntry::WritePacket(WorldPacket& data, ByteBuffer& /*content*/
 
     data.WriteBit(guid[3]);
     data.WriteBits(0, 24); // Not yet implemented used for guild achievements
-    data.WriteBit(guid[4]);
-    data.WriteBit(guid[5]);
-    data.WriteBit(guid[6]);
-    data.WriteBit(guid[0]);
-    data.WriteBit(guid[7]);
-    data.WriteBit(guid[2]);
-    data.WriteBit(guid[1]);
+    data.WriteGuidMask(guid, 4, 5, 6, 0, 7, 2, 1);
 
     data.FlushBits();
 
     data.WriteByteSeq(guid[2]);
     data << uint32(GetValue());
-    data.WriteByteSeq(guid[1]);
-    data.WriteByteSeq(guid[7]);
-    data.WriteByteSeq(guid[4]);
-    data.WriteByteSeq(guid[3]);
-    data.WriteByteSeq(guid[5]);
+    data.WriteGuidBytes(guid, 1, 7, 4, 3, 5);
     data << uint32(0);
     data << uint32(GetType());
     data << uint32(GetFlags());   // 1 sticky
@@ -391,6 +358,7 @@ void Guild::RankInfo::SaveToDB(SQLTransaction& trans) const
     stmt->setUInt8 (1, m_rankId);
     stmt->setString(2, m_name);
     stmt->setUInt32(3, m_rights);
+    stmt->setUInt32(3, m_bankMoneyPerDay);
     CharacterDatabase.ExecuteOrAppend(trans, stmt);
 }
 
@@ -622,7 +590,8 @@ void Guild::BankTab::SendText(Guild const* guild, WorldSession* session) const
 
     if (session)
     {
-        TC_LOG_DEBUG("guild", "SMSG_GUILD_BANK_QUERY_TEXT_RESULT [%s]: Tabid: %u, Text: %s", session->GetPlayerInfo().c_str(), m_tabId, m_text.c_str());
+        TC_LOG_DEBUG("guild", "SMSG_GUILD_BANK_QUERY_TEXT_RESULT [%s]: Tabid: %u, Text: %s"
+            , session->GetPlayerInfo().c_str(), m_tabId, m_text.c_str());
         session->SendPacket(&data);
     }
     else
@@ -632,8 +601,36 @@ void Guild::BankTab::SendText(Guild const* guild, WorldSession* session) const
     }
 }
 
+void Guild::Member::_SetProfessions(Player const* player)
+{
+    if (!m_professions.empty())
+        m_professions.clear();
+
+    SkillStatusMap const& skillMap = player->GetSkillStatusMap();
+
+    for (SkillStatusMap::const_iterator itr = skillMap.begin(); itr != skillMap.end(); ++itr)
+    {
+        if (itr->second.uState == SKILL_DELETED)
+            continue;
+
+        uint32 pskill = itr->first;
+        if (!IsPrimaryProfessionSkill(pskill))
+            continue;
+
+        uint16 field = itr->second.pos / 2;
+        uint8 offset = itr->second.pos & 1;
+
+        ProfessionInfo profInfo;
+        profInfo.skillId = pskill;
+        profInfo.skillValue = player->GetSkillValue(pskill);
+        profInfo.rank = player->GetUInt16Value(PLAYER_FIELD_SKILL_STEPS + field, offset);
+
+        m_professions.push_back(profInfo);
+    }
+}
+
 // Member
-void Guild::Member::SetStats(Player* player)
+void Guild::Member::SetStats(Player* player, bool save)
 {
     m_name      = player->GetName();
     m_level     = player->getLevel();
@@ -641,16 +638,39 @@ void Guild::Member::SetStats(Player* player)
     m_zoneId    = player->GetZoneId();
     m_accountId = player->GetSession()->GetAccountId();
     m_achievementPoints = player->GetAchievementPoints();
+    m_totalReputation = player->GetReputation(GUILD_FACTION_ID);
+    _SetProfessions(player);
+
+    if (save)
+    {
+        PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_MEMBER_ROSTER_INFO);
+        stmt->setUInt32(0, m_achievementPoints);
+        for (uint8 i = 0; i < std::min((uint8)m_professions.size(), (uint8)MAX_GUILD_PROFESSIONS); i++)
+        {
+            stmt->setUInt16(1 + (3 * i), m_professions[i].skillId);
+            stmt->setUInt16(2 + (3 * i), m_professions[i].skillValue);
+            stmt->setUInt8(3 + (3 * i), m_professions[i].rank);
+        }
+
+        for (uint8 i = m_professions.size(); i < (uint8)MAX_GUILD_PROFESSIONS; i++)
+        {
+            stmt->setUInt16(1 + (3 * i), 0);
+            stmt->setUInt16(2 + (3 * i), 0);
+            stmt->setUInt8(3 + (3 * i), 0);
+        }
+
+        stmt->setUInt32(7, GUID_LOPART(m_guid));
+        CharacterDatabase.Execute(stmt);
+    }
 }
 
-void Guild::Member::SetStats(std::string const& name, uint8 level, uint8 _class, uint32 zoneId, uint32 accountId, uint32 reputation)
+void Guild::Member::SetStats(std::string const& name, uint8 level, uint8 _class, uint32 zoneId, uint32 accountId)
 {
     m_name      = name;
     m_level     = level;
     m_class     = _class;
     m_zoneId    = zoneId;
     m_accountId = accountId;
-    m_totalReputation = reputation;
 }
 
 void Guild::Member::SetPublicNote(std::string const& publicNote)
@@ -679,7 +699,7 @@ void Guild::Member::SetOfficerNote(std::string const& officerNote)
     CharacterDatabase.Execute(stmt);
 }
 
-void Guild::Member::ChangeRank(uint8 newRank)
+void Guild::Member::ChangeRank(uint8 newRank, bool UpdateDB)
 {
     m_rankId = newRank;
 
@@ -687,20 +707,52 @@ void Guild::Member::ChangeRank(uint8 newRank)
     if (Player* player = FindPlayer())
         player->SetRank(newRank);
 
+    if (!UpdateDB)
+        return;
+
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_MEMBER_RANK);
     stmt->setUInt8 (0, newRank);
     stmt->setUInt32(1, GUID_LOPART(m_guid));
     CharacterDatabase.Execute(stmt);
 }
 
+void Guild::Member::AddReputation(uint32 reputation)
+{
+    m_weekReputation += reputation;
+    m_totalReputation += reputation;
+
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_MEMBER_REPUTATION);
+    stmt->setUInt32(0, m_weekReputation);
+    stmt->setUInt32(1, m_totalReputation);
+    stmt->setUInt32(2, GUID_LOPART(m_guid));
+    CharacterDatabase.Execute(stmt);
+}
+
+void Guild::Member::AddActivity(uint32 activity)
+{
+    m_weekActivity += activity;
+    m_totalActivity += activity;
+
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_MEMBER_ACTIVITY);
+    stmt->setUInt32(0, m_weekActivity);
+    stmt->setUInt32(1, m_totalActivity);
+    stmt->setUInt32(2, GUID_LOPART(m_guid));
+    CharacterDatabase.Execute(stmt);
+}
+
+
 void Guild::Member::SaveToDB(SQLTransaction& trans) const
 {
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GUILD_MEMBER);
     stmt->setUInt32(0, m_guildId);
     stmt->setUInt32(1, GUID_LOPART(m_guid));
-    stmt->setUInt8 (2, m_rankId);
+    stmt->setUInt8(2, m_rankId);
     stmt->setString(3, m_publicNote);
     stmt->setString(4, m_officerNote);
+    stmt->setUInt32(5, m_weekActivity);
+    stmt->setUInt32(6, m_totalActivity);
+    stmt->setUInt32(7, m_weekReputation);
+    stmt->setUInt32(8, m_totalReputation);
     CharacterDatabase.ExecuteOrAppend(trans, stmt);
 }
 
@@ -712,19 +764,32 @@ bool Guild::Member::LoadFromDB(Field* fields)
     m_publicNote  = fields[3].GetString();
     m_officerNote = fields[4].GetString();
 
-    for (uint8 i = 0; i <= GUILD_BANK_MAX_TABS; ++i)
+    for (uint8 i = 0; i < GUILD_BANK_MAX_TABS; ++i)
         m_bankWithdraw[i] = fields[5 + i].GetUInt32();
 
+    m_bankWithdrawMoney = fields[13].GetUInt64();
     SetStats(fields[14].GetString(),
              fields[15].GetUInt8(),                         // characters.level
              fields[16].GetUInt8(),                         // characters.class
              fields[17].GetUInt16(),                        // characters.zone
-             fields[18].GetUInt32(),                        // characters.account
-             0);
+             fields[18].GetUInt32());                       // characters.account
+
     m_logoutTime = fields[19].GetUInt32();                  // characters.logout_time
-    m_totalActivity = 0;
-    m_weekActivity = 0;
-    m_weekReputation = 0;
+    m_weekActivity = fields[20].GetUInt32();                // gm.weekActivity
+    m_totalActivity = fields[21].GetUInt32();               // gm.totalActivity
+    m_weekReputation = fields[22].GetUInt32();              // gm.weekReputation
+    m_totalReputation = fields[23].GetUInt32();             // gm.totalReputation
+    m_achievementPoints = fields[24].GetUInt32();           // gm.achievementPoints
+
+    for (uint8 i = 0; i < MAX_GUILD_PROFESSIONS; i++)
+    {
+        ProfessionInfo profInfo;
+        profInfo.skillId = fields[25 + (3 * i)].GetUInt16();      // gm.firstSkillId / gm.secondSkillId
+        profInfo.skillValue = fields[26 + (3 * i)].GetUInt16();   // gm.firstSkillValue / gm.secondSkillValue
+        profInfo.rank = fields[27 + (3 * i)].GetUInt8();          // gm.firstSkillRank / gm.secondSkillRank;
+
+        m_professions.push_back(profInfo);
+    }
 
     if (!CheckStats())
         return false;
@@ -755,16 +820,24 @@ bool Guild::Member::CheckStats() const
     return true;
 }
 
-// Decreases amount of money/slots left for today.
-// If (tabId == GUILD_BANK_MAX_TABS) decrease money amount.
-// Otherwise decrease remaining items amount for specified tab.
-void Guild::Member::UpdateBankWithdrawValue(SQLTransaction& trans, uint8 tabId, uint32 amount)
+void Guild::Member::UpdateBankWithdrawMoney(SQLTransaction& trans, uint64 amount)
 {
-    m_bankWithdraw[tabId] += amount;
+    m_bankWithdrawMoney += amount;
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GUILD_MEMBER_WITHDRAW_MONEY);
+    stmt->setUInt32(0, GUID_LOPART(m_guid));
+    stmt->setUInt64(1, m_bankWithdrawMoney);
+    CharacterDatabase.ExecuteOrAppend(trans, stmt);
+}
+
+// Decreases amount of money/slots left for today.
+// Decrease remaining items amount for specified tab.
+void Guild::Member::UpdateBankWithdrawValue(SQLTransaction& trans, uint8 tabId)
+{
+    m_bankWithdraw[tabId]++;
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GUILD_MEMBER_WITHDRAW);
     stmt->setUInt32(0, GUID_LOPART(m_guid));
-    for (uint8 i = 0; i <= GUILD_BANK_MAX_TABS;)
+    for (uint8 i = 0; i < GUILD_BANK_MAX_TABS;)
     {
         uint32 withdraw = m_bankWithdraw[i++];
         stmt->setUInt32(i, withdraw);
@@ -775,9 +848,10 @@ void Guild::Member::UpdateBankWithdrawValue(SQLTransaction& trans, uint8 tabId, 
 
 void Guild::Member::ResetValues(bool weekly /* = false*/)
 {
-    for (uint8 tabId = 0; tabId <= GUILD_BANK_MAX_TABS; ++tabId)
+    for (uint8 tabId = 0; tabId < GUILD_BANK_MAX_TABS; ++tabId)
         m_bankWithdraw[tabId] = 0;
 
+    m_bankWithdrawMoney = 0;
     if (weekly)
     {
         m_weekActivity = 0;
@@ -786,15 +860,22 @@ void Guild::Member::ResetValues(bool weekly /* = false*/)
 }
 
 // Get amount of money/slots left for today.
-// If (tabId == GUILD_BANK_MAX_TABS) return money amount.
-// Otherwise return remaining items amount for specified tab.
+// Return remaining items amount for specified tab.
 int32 Guild::Member::GetBankWithdrawValue(uint8 tabId) const
 {
     // Guild master has unlimited amount.
     if (IsRank(GR_GUILDMASTER))
-        return tabId == GUILD_BANK_MAX_TABS ? GUILD_WITHDRAW_MONEY_UNLIMITED : GUILD_WITHDRAW_SLOT_UNLIMITED;
+        return GUILD_WITHDRAW_SLOT_UNLIMITED;
 
     return m_bankWithdraw[tabId];
+}
+
+int64 Guild::Member::GetBankWithdrawMoney() const
+{
+    if (IsRank(GR_GUILDMASTER))
+        return GUILD_WITHDRAW_MONEY_UNLIMITED;
+
+    return m_bankWithdrawMoney;
 }
 
 // EmblemInfo
@@ -1378,23 +1459,11 @@ bool Guild::SetName(std::string const& name)
     WorldPacket data(SMSG_GUILD_RENAMED, 24 + 8 + 1);
     data.WriteBit(guid[5]);
     data.WriteBits(name.length(), 8);
-    data.WriteBit(guid[4]);
-    data.WriteBit(guid[0]);
-    data.WriteBit(guid[6]);
-    data.WriteBit(guid[3]);
-    data.WriteBit(guid[1]);
-    data.WriteBit(guid[7]);
-    data.WriteBit(guid[2]);
+    data.WriteGuidMask(guid, 4, 0, 6, 3, 1, 7, 2);
 
-    data.WriteByteSeq(guid[3]);
-    data.WriteByteSeq(guid[2]);
-    data.WriteByteSeq(guid[7]);
-    data.WriteByteSeq(guid[1]);
-    data.WriteByteSeq(guid[0]);
-    data.WriteByteSeq(guid[6]);
+    data.WriteGuidBytes(guid, 3, 2, 7, 1, 0, 6);
     data.WriteString(name);
-    data.WriteByteSeq(guid[4]);
-    data.WriteByteSeq(guid[5]);
+    data.WriteGuidBytes(guid, 4, 5);
 
     BroadcastPacket(&data);
     return true;
@@ -1421,15 +1490,10 @@ void Guild::HandleRoster(WorldSession* session /*= NULL*/)
         data.WriteBit(guid[5]);
         data.WriteBit(0); // Can Scroll of Ressurect
         data.WriteBits(pubNoteLength, 8);
-        data.WriteBit(guid[7]);
-        data.WriteBit(guid[0]);
-        data.WriteBit(guid[6]);
+        data.WriteGuidMask(guid, 7, 0, 6);
         data.WriteBits(member->GetName().length(), 6);
         data.WriteBit(0); // Has Authenticator
-        data.WriteBit(guid[3]);
-        data.WriteBit(guid[4]);
-        data.WriteBit(guid[1]);
-        data.WriteBit(guid[2]);
+        data.WriteGuidMask(guid, 3, 4, 1, 2);
 
         memberData << uint8(member->GetClass());
         memberData << uint32(member->GetTotalReputation());
@@ -1437,8 +1501,12 @@ void Guild::HandleRoster(WorldSession* session /*= NULL*/)
         memberData.WriteByteSeq(guid[0]);
 
         // for (2 professions)
-        memberData << uint32(0) << uint32(0) << uint32(0);
-        memberData << uint32(0) << uint32(0) << uint32(0);
+        std::vector<ProfessionInfo> professionInfo = member->GetProfessionsInfo();
+        for (uint8 i = 0; i < std::min((uint8)professionInfo.size(), (uint8)MAX_GUILD_PROFESSIONS); i++)
+            memberData << uint32(professionInfo[i].rank) << uint32(professionInfo[i].skillId) << uint32(professionInfo[i].skillValue);
+
+        for (uint8 i = professionInfo.size(); i < (uint8)MAX_GUILD_PROFESSIONS; i++) // if player doesnt have 2 professions
+            memberData << uint32(0) << uint32(0) << uint32(0);
 
         memberData << uint8(member->GetLevel());
         memberData << uint8(member->GetFlags());
@@ -1451,15 +1519,12 @@ void Guild::HandleRoster(WorldSession* session /*= NULL*/)
         memberData << uint8(0);        // Gender
         memberData << uint32(member->GetRankId());
         memberData << uint32(realmID);
-        memberData.WriteByteSeq(guid[5]);
-        memberData.WriteByteSeq(guid[7]);
+        memberData.WriteGuidBytes(guid, 5, 7);
         memberData.WriteString(member->GetPublicNote());
         memberData.WriteByteSeq(guid[4]);
         memberData << uint64(member->GetWeekActivity());
         memberData << uint32(member->GetAchievementPoints());
-        memberData.WriteByteSeq(guid[6]);
-        memberData.WriteByteSeq(guid[1]);
-        memberData.WriteByteSeq(guid[2]);
+        memberData.WriteGuidBytes(guid, 6, 1, 2);
     }
 
     data.WriteBits(m_info.length(), 11);
@@ -1498,28 +1563,16 @@ void Guild::HandleQuery(WorldSession* session)
     // if (hasData)
     {
         data.WriteBits(_GetRanksSize(), 21);
-        data.WriteBit(guid[5]);
-        data.WriteBit(guid[1]);
-        data.WriteBit(guid[4]);
-        data.WriteBit(guid[7]);
+        data.WriteGuidMask(guid, 5, 1, 4, 7);
 
         for (uint8 i = 0; i < _GetRanksSize(); i++)
             data.WriteBits(m_ranks[i].GetName().length(), 7);
 
-        data.WriteBit(guid[3]);
-        data.WriteBit(guid[2]);
-        data.WriteBit(guid[0]);
-        data.WriteBit(guid[6]);
+        data.WriteGuidMask(guid, 3, 2, 0, 6);
         data.WriteBits(m_name.length(), 7);
     }
 
-    data.WriteBit(guid[3]);
-    data.WriteBit(guid[7]);
-    data.WriteBit(guid[2]);
-    data.WriteBit(guid[1]);
-    data.WriteBit(guid[0]);
-    data.WriteBit(guid[4]);
-    data.WriteBit(guid[6]);
+    data.WriteGuidMask(guid, 3, 7, 2, 1, 0, 4, 6);
 
     data.FlushBits();
 
@@ -1528,8 +1581,7 @@ void Guild::HandleQuery(WorldSession* session)
         data << uint32(m_emblemInfo.GetBorderStyle());
         data << uint32(m_emblemInfo.GetStyle());
 
-        data.WriteByteSeq(guid[2]);
-        data.WriteByteSeq(guid[7]);
+        data.WriteGuidBytes(guid, 2, 7);
 
         data << uint32(m_emblemInfo.GetColor());
         data << uint32(realmID);
@@ -1544,25 +1596,14 @@ void Guild::HandleQuery(WorldSession* session)
         data.WriteString(m_name);
         data << uint32(m_emblemInfo.GetBorderColor());
 
-        data.WriteByteSeq(guid[5]);
-        data.WriteByteSeq(guid[4]);
+        data.WriteGuidBytes(guid, 5, 4);
 
         data << uint32(m_emblemInfo.GetBackgroundColor());
 
-        data.WriteByteSeq(guid[1]);
-        data.WriteByteSeq(guid[6]);
-        data.WriteByteSeq(guid[0]);
-        data.WriteByteSeq(guid[3]);
+        data.WriteGuidBytes(guid, 1, 6, 0, 3);
     }
 
-    data.WriteByteSeq(guid[2]);
-    data.WriteByteSeq(guid[6]);
-    data.WriteByteSeq(guid[4]);
-    data.WriteByteSeq(guid[0]);
-    data.WriteByteSeq(guid[7]);
-    data.WriteByteSeq(guid[3]);
-    data.WriteByteSeq(guid[5]);
-    data.WriteByteSeq(guid[1]);
+    data.WriteGuidBytes(guid, 2, 6, 4, 0, 7, 3, 5, 1);
 
     session->SendPacket(&data);
     TC_LOG_DEBUG("guild", "SMSG_GUILD_QUERY_RESPONSE [%s]", session->GetPlayerInfo().c_str());
@@ -1619,8 +1660,6 @@ void Guild::HandleSetMOTD(WorldSession* session, std::string const& motd)
         stmt->setString(0, motd);
         stmt->setUInt32(1, m_id);
         CharacterDatabase.Execute(stmt);
-
-        _BroadcastEvent(GE_MOTD, 0, motd.c_str());
     }
 }
 
@@ -1663,6 +1702,42 @@ void Guild::HandleSetEmblem(WorldSession* session, const EmblemInfo& emblemInfo)
     }
 }
 
+void Guild::_SendSetNewGuildMaster(Member const* guildMaster, Member const* newGuildMaster, bool replace) const
+{
+    ObjectGuid gumGuid = guildMaster->GetGUID();
+    ObjectGuid newGumGuid = newGuildMaster->GetGUID();
+
+    WorldPacket data(SMSG_GUILD_SET_GUILD_MASTER, guildMaster->GetName().size() + newGuildMaster->GetName().size() + 2 * 8);
+    data.WriteGuidMask(newGumGuid, 4, 2, 7);
+    data.WriteBit(gumGuid[4]);
+    data.WriteBits(guildMaster->GetName().size(), 6);
+    data.WriteBit(gumGuid[0]);
+    data.WriteGuidMask(newGumGuid, 6, 3);
+    data.WriteBit(replace);
+    data.WriteGuidMask(newGumGuid, 1, 0);
+    data.WriteGuidMask(gumGuid, 1, 7, 3, 6, 2);
+    data.WriteBits(newGuildMaster->GetName().size(), 6);
+    data.WriteBit(gumGuid[5]);
+    data.WriteBit(newGumGuid[5]);
+    data.FlushBits();
+
+    data.WriteGuidBytes(newGumGuid, 5, 6);
+    data.WriteString(guildMaster->GetName());
+    data.WriteString(newGuildMaster->GetName());
+    data.WriteGuidBytes(newGumGuid, 3, 4);
+    data << (int32)realmID;
+    data.WriteByteSeq(gumGuid[6]);
+    data.WriteByteSeq(newGumGuid[0]);
+    data.WriteByteSeq(gumGuid[5]);
+    data.WriteGuidBytes(newGumGuid, 2, 7);
+    data.WriteGuidBytes(gumGuid, 7, 4);
+    data << (int32)realmID;
+    data.WriteByteSeq(newGumGuid[1]);
+    data.WriteGuidBytes(gumGuid, 2, 1, 3, 0);
+    
+    BroadcastPacket(&data);
+}
+
 void Guild::HandleSetNewGuildMaster(WorldSession* session, std::string const& name)
 {
     Player* player = session->GetPlayer();
@@ -1676,8 +1751,35 @@ void Guild::HandleSetNewGuildMaster(WorldSession* session, std::string const& na
         if (Member* newGuildMaster = GetMember(name))
         {
             _SetLeaderGUID(newGuildMaster);
-            oldGuildMaster->ChangeRank(GR_INITIATE);
-            _BroadcastEvent(GE_LEADER_CHANGED, 0, player->GetName().c_str(), name.c_str());
+            oldGuildMaster->ChangeRank(_GetLowestRankId());
+            _SendSetNewGuildMaster(oldGuildMaster, newGuildMaster, false);
+        }
+    }
+}
+
+void Guild::HandleReplaceGuildMaster(WorldSession* session)
+{
+    Player* player = session->GetPlayer();
+
+    if (Member* newGuildMaster = GetMember(player->GetGUID()))
+    {
+        if (newGuildMaster->GetRankId() > GR_MEMBER) // 3 ranks down from gum is the requirements
+        {
+            SendCommandResult(session, GUILD_COMMAND_CHANGE_LEADER, ERR_GUILD_PERMISSIONS);
+            return;
+        }
+
+        if (Member* oldGuildMaster = GetMember(m_leaderGuid))
+        {
+            if (oldGuildMaster->GetLogoutTime() > uint64(time(NULL) - (DAY * 90)))
+            {
+                SendCommandResult(session, GUILD_COMMAND_CHANGE_LEADER, ERR_GUILD_PERMISSIONS);
+                return;
+            }
+
+            _SetLeaderGUID(newGuildMaster);
+            oldGuildMaster->ChangeRank(_GetLowestRankId());
+            _SendSetNewGuildMaster(oldGuildMaster, newGuildMaster, true);
         }
     }
 }
@@ -1688,7 +1790,7 @@ void Guild::HandleSetBankTabInfo(WorldSession* session, uint8 tabId, std::string
     if (!tab)
     {
         TC_LOG_ERROR("guild", "Guild::HandleSetBankTabInfo: Player %s trying to change bank tab info from unexisting tab %d.",
-                       session->GetPlayerInfo().c_str(), tabId);
+            session->GetPlayerInfo().c_str(), tabId);
         return;
     }
 
@@ -1713,7 +1815,8 @@ void Guild::HandleSetBankTabInfo(WorldSession* session, uint8 tabId, std::string
     BroadcastPacket(&data);
 }
 
-void Guild::HandleSetMemberNote(WorldSession* session, std::string const& note, uint64 guid, bool isPublic)
+
+void Guild::HandleSetMemberNote(WorldSession* session, std::string const& note, ObjectGuid guid, bool isPublic)
 {
     // Player must have rights to set public/officer note
     if (!_HasRankRight(session->GetPlayer(), isPublic ? GR_RIGHT_EPNOTE : GR_RIGHT_EOFFNOTE))
@@ -1727,7 +1830,7 @@ void Guild::HandleSetMemberNote(WorldSession* session, std::string const& note, 
 
         ObjectGuid memberGuid = member->GetGUID();
 
-        WorldPacket data(SMSG_GUILD_MEMBER_UPDATE_NOTE, 1 + 1 + 1 + 8 + note.length());
+        WorldPacket data(SMSG_GUILD_SET_NOTE, 1 + 1 + 1 + 8 + note.length());
 
         data.WriteBit(memberGuid[2]);
         data.WriteBits(note.length(), 8);
@@ -1753,12 +1856,12 @@ void Guild::HandleSetMemberNote(WorldSession* session, std::string const& note, 
 
         if (session)
         {
-            TC_LOG_DEBUG("guild", "SMSG_GUILD_MEMBER_UPDATE_NOTE [%s]", session->GetPlayerInfo().c_str());
+            TC_LOG_DEBUG("guild", "SMSG_GUILD_SET_NOTE [%s]", session->GetPlayerInfo().c_str());
             session->SendPacket(&data);
         }
         else
         {
-            TC_LOG_DEBUG("guild", "SMSG_GUILD_MEMBER_UPDATE_NOTE [Broadcast]");
+            TC_LOG_DEBUG("guild", "SMSG_GUILD_SET_NOTE [Broadcast]");
             BroadcastPacket(&data);
         }
     }
@@ -1817,7 +1920,6 @@ void Guild::HandleBuyBankTab(WorldSession* session, uint8 tabId)
     }
 
     _CreateNewBankTab();
-
     WorldPacket data(SMSG_GUILD_EVENT_BANK_TAB_ADDED, 0);
     BroadcastPacket(&data);
 
@@ -1826,8 +1928,8 @@ void Guild::HandleBuyBankTab(WorldSession* session, uint8 tabId)
 
 void Guild::HandleInviteMember(WorldSession* session, std::string const& name)
 {
-    Player* pInvitee = sObjectAccessor->FindPlayerByName(name);
-    if (!pInvitee)
+    Player* pInvited = sObjectAccessor->FindPlayerByName(name);
+    if (!pInvited)
     {
         SendCommandResult(session, GUILD_COMMAND_INVITE, ERR_GUILD_PLAYER_NOT_FOUND_S, name);
         return;
@@ -1835,28 +1937,29 @@ void Guild::HandleInviteMember(WorldSession* session, std::string const& name)
 
     Player* player = session->GetPlayer();
     // Do not show invitations from ignored players
-    if (pInvitee->GetSocial()->HasIgnore(player->GetGUIDLow()))
+    if (pInvited->GetSocial()->HasIgnore(player->GetGUIDLow()))
         return;
 
-    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GUILD) && pInvitee->GetTeam() != player->GetTeam())
+    if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GUILD) && pInvited->GetTeam() != player->GetTeam())
     {
         SendCommandResult(session, GUILD_COMMAND_INVITE, ERR_GUILD_NOT_ALLIED, name);
         return;
     }
 
     // Invited player cannot be in another guild
-    /*if (pInvitee->GetGuildId())
+    if (pInvited->GetGuildId())
     {
         SendCommandResult(session, GUILD_COMMAND_INVITE, ERR_ALREADY_IN_GUILD_S, name);
         return;
-    }*/
+    }
 
     // Invited player cannot be invited
-    if (pInvitee->GetGuildIdInvited())
+    if (pInvited->GetGuildIdInvited())
     {
         SendCommandResult(session, GUILD_COMMAND_INVITE, ERR_ALREADY_INVITED_TO_GUILD_S, name);
         return;
     }
+
     // Inviting player must have rights to invite
     if (!_HasRankRight(player, GR_RIGHT_INVITE))
     {
@@ -1868,66 +1971,77 @@ void Guild::HandleInviteMember(WorldSession* session, std::string const& name)
 
     TC_LOG_DEBUG("guild", "Player %s invited %s to join his Guild", player->GetName().c_str(), name.c_str());
 
-    pInvitee->SetGuildIdInvited(m_id);
-    _LogEvent(GUILD_EVENT_LOG_INVITE_PLAYER, player->GetGUIDLow(), pInvitee->GetGUIDLow());
+    // Auto decline invite
+    if (pInvited->HasFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_AUTO_DECLINE_GUILD))
+    {
+        player->SendDeclineGuildInvitation(pInvited->GetName(), true);
+        return;
+    }
 
-    ObjectGuid oldGuildGuid = MAKE_NEW_GUID(pInvitee->GetGuildId(), 0, pInvitee->GetGuildId() ? uint32(HIGHGUID_GUILD) : 0);
+    pInvited->SetGuildIdInvited(m_id);
+    pInvited->SetLastGuildInviterGUID(player->GetGUID());
+
+    _LogEvent(GUILD_EVENT_LOG_INVITE_PLAYER, player->GetGUIDLow(), pInvited->GetGUIDLow());
+
     ObjectGuid newGuildGuid = GetGUID();
+    ObjectGuid oldGuildGuid = 0;
 
-    WorldPacket data(SMSG_GUILD_INVITE, 100);
+    std::string oldGuildName = "";
+    uint32 oldGuildRealmID = 0;
+
+    // previous guild
+    /*if (Guild* guild = pInvited->GetGuild())
+    {
+        oldGuildGuid = guild->GetGUID();
+        oldGuildName = guild->GetName();
+        oldGuildRealmID = realmID;
+    }*/
+
+    WorldPacket data(SMSG_GUILD_INVITE, 51 + player->GetName().length() + m_name.length() + oldGuildName.length());
     data.WriteBit(newGuildGuid[4]);
     data.WriteBits(m_name.length(), 7);
     data.WriteBit(oldGuildGuid[4]);
     data.WriteBit(newGuildGuid[6]);
-    data.WriteBit(oldGuildGuid[2]);
-    data.WriteBit(oldGuildGuid[1]);
-    data.WriteBit(oldGuildGuid[5]);
-    data.WriteBit(oldGuildGuid[7]);
+    data.WriteGuidMask(oldGuildGuid, 2, 1, 5, 7);
     data.WriteBit(newGuildGuid[0]);
     data.WriteBit(oldGuildGuid[3]);
     data.WriteBit(newGuildGuid[5]);
     data.WriteBit(oldGuildGuid[6]);
     data.WriteBits(player->GetName().length(), 6);
-    data.WriteBit(newGuildGuid[1]);
-    data.WriteBit(newGuildGuid[3]);
+    data.WriteGuidMask(newGuildGuid, 1, 3);
     data.WriteBit(oldGuildGuid[0]);
-    data.WriteBit(newGuildGuid[7]);
-    data.WriteBits(pInvitee->GetGuildName().length(), 7);
     data.WriteBit(newGuildGuid[2]);
-
+    data.WriteBits(oldGuildName.length(), 7);
+    data.WriteBit(newGuildGuid[7]);
     data.FlushBits();
 
     data.WriteByteSeq(newGuildGuid[1]);
-    data << uint32(m_emblemInfo.GetBackgroundColor());
+    data << (uint32)m_emblemInfo.GetBackgroundColor();
     data.WriteByteSeq(newGuildGuid[4]);
     data.WriteString(player->GetName());
-    data << uint32(m_emblemInfo.GetBorderStyle());
+    data << (uint32)m_emblemInfo.GetBorderStyle();
     data.WriteByteSeq(oldGuildGuid[7]);
-    data.WriteByteSeq(newGuildGuid[0]);
-    data.WriteByteSeq(newGuildGuid[2]);
-    data << uint32(m_emblemInfo.GetColor());
-    data.WriteByteSeq(oldGuildGuid[2]);
-    data.WriteByteSeq(oldGuildGuid[5]);
-    data << uint32(GetLevel());
-    data << uint32(pInvitee->GetGuildId() ? realmID : 0);
-    data.WriteByteSeq(newGuildGuid[7]);
-    data.WriteByteSeq(newGuildGuid[3]);
+    data.WriteGuidBytes(newGuildGuid, 0, 2);
+    data << (uint32)m_emblemInfo.GetColor();
+    data.WriteGuidBytes(oldGuildGuid, 2, 5);
+    data << (uint32)_level;
+    data << (uint32)oldGuildRealmID;
+    data.WriteGuidBytes(newGuildGuid, 7, 3);
     data.WriteByteSeq(oldGuildGuid[4]);
-    data << uint32(m_emblemInfo.GetBorderColor());
+    data << m_emblemInfo.GetBorderColor();
     data.WriteString(m_name);
-    data << uint32(realmID);
-    data << uint32(m_emblemInfo.GetStyle());
+    data << (uint32)realmID; // Guild Realm ID
+    data << (uint32)m_emblemInfo.GetStyle();
     data.WriteByteSeq(oldGuildGuid[0]);
-    data.WriteString(pInvitee->GetGuildName());
+    data.WriteString(oldGuildName);
     data.WriteByteSeq(newGuildGuid[5]);
-    data << uint32(realmID);
+    data << (uint32)realmID; // Inviter Realm ID
     data.WriteByteSeq(oldGuildGuid[1]);
     data.WriteByteSeq(newGuildGuid[6]);
-    data.WriteByteSeq(oldGuildGuid[3]);
-    data.WriteByteSeq(oldGuildGuid[6]);
+    data.WriteGuidBytes(oldGuildGuid, 3, 6);
 
-    pInvitee->GetSession()->SendPacket(&data);
-    TC_LOG_DEBUG("guild", "SMSG_GUILD_INVITE [%s]", pInvitee->GetName().c_str());
+    pInvited->GetSession()->SendPacket(&data);
+    TC_LOG_DEBUG("guild", "SMSG_GUILD_INVITE [%s]", pInvited->GetName().c_str());
 }
 
 void Guild::HandleAcceptMember(WorldSession* session)
@@ -1962,12 +2076,10 @@ void Guild::HandleLeaveMember(WorldSession* session)
     }
     else
     {
+        _SendRemovePlayerFromGuild(player->GetGUID(), player->GetName());
         DeleteMember(player->GetGUID(), false, false);
 
         _LogEvent(GUILD_EVENT_LOG_LEAVE_GUILD, player->GetGUIDLow());
-        _BroadcastEvent(GE_LEFT, player->GetGUID(), player->GetName().c_str());
-
-        SendCommandResult(session, GUILD_COMMAND_QUIT, ERR_GUILD_COMMAND_SUCCESS, m_name);
     }
 
     sCalendarMgr->RemovePlayerGuildEventsAndSignups(player->GetGUID(), GetId());
@@ -1998,11 +2110,10 @@ void Guild::HandleRemoveMember(WorldSession* session, uint64 guid)
                 SendCommandResult(session, GUILD_COMMAND_REMOVE, ERR_GUILD_RANK_TOO_HIGH_S, name);
             else
             {
+                _SendRemovePlayerFromGuild(guid, name, player->GetGUID(), player->GetName());
                 // After call to DeleteMember pointer to member becomes invalid
                 DeleteMember(guid, false, true);
                 _LogEvent(GUILD_EVENT_LOG_UNINVITE_PLAYER, player->GetGUIDLow(), GUID_LOPART(guid));
-                _BroadcastEvent(GE_REMOVED, 0, name.c_str(), player->GetName().c_str());
-                SendCommandResult(session, GUILD_COMMAND_REMOVE, ERR_GUILD_COMMAND_SUCCESS, name);
             }
         }
     }
@@ -2022,7 +2133,7 @@ void Guild::HandleUpdateMemberRank(WorldSession* session, uint64 guid, bool demo
         // Player cannot promote himself
         if (member->IsSamePlayer(player->GetGUID()))
         {
-            SendCommandResult(session, type, ERR_GUILD_NAME_INVALID);
+            SendCommandResult(session, type, ERR_GUILD_PERMISSIONS);
             return;
         }
 
@@ -2055,9 +2166,7 @@ void Guild::HandleUpdateMemberRank(WorldSession* session, uint64 guid, bool demo
         }
 
         uint32 newRankId = member->GetRankId() + (demote ? 1 : -1);
-        member->ChangeRank(newRankId);
-        _LogEvent(demote ? GUILD_EVENT_LOG_DEMOTE_PLAYER : GUILD_EVENT_LOG_PROMOTE_PLAYER, player->GetGUIDLow(), GUID_LOPART(member->GetGUID()), newRankId);
-        _BroadcastEvent(demote ? GE_DEMOTION : GE_PROMOTION, 0, player->GetName().c_str(), name.c_str(), _GetRankName(newRankId).c_str());
+        SendGuildRanksUpdate(player->GetGUID(), member->GetGUID(), newRankId);
     }
 }
 
@@ -2106,26 +2215,169 @@ void Guild::HandleAddNewRank(WorldSession* session, std::string const& name)
             _BroadcastEvent(GE_RANK_CREATED, 0);
 }
 
+void Guild::HandleUpdateRank(WorldSession* session, uint32 GuildID, bool RankId)
+{
+    // Only leader can update rank
+    if (!_IsLeader(session->GetPlayer()))
+        SendCommandResult(session, GUILD_COMMAND_INVITE, ERR_GUILD_PERMISSIONS);
+    else
+    {
+        // update rank
+        RankInfo* RankInfo1 = NULL;
+        RankInfo* RankInfo2 = NULL;
+        uint32 GuildId = GuildID - (-1 + 2 * uint8(RankId));
+        for (uint32 i = 0; i < m_ranks.size(); ++i)
+        {
+            if (m_ranks[i].GetId() == GuildID)
+                RankInfo1 = &m_ranks[i];
+            if (m_ranks[i].GetId() == GuildId)
+                RankInfo2 = &m_ranks[i];
+        }
+        if (!RankInfo1 || !RankInfo2)
+            return;
+
+        RankInfo tmp = NULL;
+        tmp = *RankInfo2;
+        RankInfo2->SetName(RankInfo1->GetName());
+        RankInfo2->SetRights(RankInfo1->GetRights());
+        RankInfo1->SetName(tmp.GetName());
+        RankInfo1->SetRights(tmp.GetRights());
+        
+        HandleQuery(session);
+        HandleRoster();
+        SendGuildRankInfo(session);
+    }
+}
+
 void Guild::HandleRemoveRank(WorldSession* session, uint8 rankId)
 {
     // Cannot remove rank if total count is minimum allowed by the client or is not leader
     if (_GetRanksSize() <= GUILD_RANKS_MIN_COUNT || rankId >= _GetRanksSize() || !_IsLeader(session->GetPlayer()))
         return;
 
-    // Delete bank rights for rank
-    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_BANK_RIGHTS_FOR_RANK);
-    stmt->setUInt32(0, m_id);
-    stmt->setUInt8(1, rankId);
-    CharacterDatabase.Execute(stmt);
-    // Delete rank
-    stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_RANK);
-    stmt->setUInt32(0, m_id);
-    stmt->setUInt8(1, rankId);
-    CharacterDatabase.Execute(stmt);
-
+    // Delete desired rank by rankId
     m_ranks.erase(m_ranks.begin() + rankId);
 
+    for (Ranks::iterator itr = m_ranks.begin(); itr != m_ranks.end(); ++itr)
+        if (itr->GetId() > rankId)
+            itr->SetId(itr->GetId() - 1);
+
+    for (Members::iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+        if (itr->second->GetRankId() > rankId)
+            itr->second->ChangeRank(itr->second->GetRankId() - 1, false);
+
+    // Update DB
+    _UpdateAllGuildRightsOnRankDeleted(rankId);
+
     _BroadcastEvent(GE_RANK_DELETED, rankId);
+}
+
+void Guild::_UpdateGuildRanksDB() const
+{
+    // Delete all records
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_RANKS);
+    stmt->setUInt32(0, m_id);
+    CharacterDatabase.Execute(stmt);
+
+    for (Ranks::const_iterator itr = m_ranks.begin(); itr != m_ranks.end(); ++itr)
+    {
+        PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GUILD_RANK);
+        stmt->setUInt32(0, m_id);
+        stmt->setUInt8(1, itr->GetId());
+        stmt->setString(2, itr->GetName());
+        stmt->setUInt32(3, itr->GetRights());
+        stmt->setUInt32(4, itr->GetBankMoneyPerDay());
+        CharacterDatabase.Execute(stmt);
+    }
+}
+
+void Guild::_UpdateBankRightsDB() const
+{
+    // Delete all records
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_BANK_RIGHTS);
+    stmt->setUInt32(0, m_id);
+    CharacterDatabase.Execute(stmt);
+
+    for (uint8 tabId = 0; tabId < _GetPurchasedTabsSize(); ++tabId)
+    {
+        for (Ranks::const_iterator itr = m_ranks.begin(); itr != m_ranks.end(); ++itr)
+        {
+            PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_INS_GUILD_BANK_RIGHT);
+            stmt->setUInt32(0, m_id);
+            stmt->setUInt8(1, tabId);
+            stmt->setUInt8(2, itr->GetId());
+            stmt->setUInt8(3, itr->GetBankTabRights(tabId));
+            stmt->setUInt32(4, itr->GetBankTabSlotsPerDay(tabId));
+            CharacterDatabase.Execute(stmt);
+        }
+    }
+}
+
+void Guild::_UpdateAllGuildRightsOnRankDeleted(uint8 rankdId) const
+{
+    // Updates Guild Bank rights
+    PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_BANK_RIGHTS_FOR_RANK);
+    stmt->setUInt32(0, m_id);
+    stmt->setUInt8(1, rankdId);
+    CharacterDatabase.Execute(stmt);
+
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_BANK_RANK_RIGHTS);
+    stmt->setUInt32(0, m_id);
+    stmt->setUInt8(1, rankdId);
+    CharacterDatabase.Execute(stmt);
+
+    // Updates Guild Ranks
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_GUILD_RANK);
+    stmt->setUInt32(0, m_id);
+    stmt->setUInt8(1, rankdId);
+    CharacterDatabase.Execute(stmt);
+
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_RANKS);
+    stmt->setUInt32(0, m_id);
+    stmt->setUInt8(1, rankdId);
+    CharacterDatabase.Execute(stmt);
+
+    // Updates Guild Member Ranks
+    stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_GUILD_MEMBER_RANKS);
+    stmt->setUInt32(0, m_id);
+    stmt->setUInt8(1, rankdId);
+    CharacterDatabase.Execute(stmt);
+}
+
+void Guild::HandleSwitchRank(uint8 rankId, bool up)
+{
+    if (rankId >= _GetRanksSize())
+        return;
+
+    if (((rankId == GR_GUILDMASTER) && up) || ((rankId == _GetLowestRankId()) && !up))
+        return;
+
+    uint32 otherRankId = rankId + (up ? -1 : 1);
+
+    // Swap every setting except RankIds
+    std::swap(m_ranks[rankId], m_ranks[otherRankId]);
+
+    // Switch Ids
+    m_ranks[rankId].SetId(rankId);
+    m_ranks[otherRankId].SetId(otherRankId);
+
+    _UpdateGuildRanksDB();
+    _UpdateBankRightsDB();
+
+    for (Members::iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+    {
+        if (itr->second->GetRankId() == rankId)
+            itr->second->ChangeRank(otherRankId);
+        else if (itr->second->GetRankId() == otherRankId)
+            itr->second->ChangeRank(rankId);
+    }
+}
+
+void Guild::_SendGuildMoney() const
+{
+    WorldPacket data(SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, 8);
+    data << m_bankMoney;
+    BroadcastPacket(&data);
 }
 
 void Guild::HandleMemberDepositMoney(WorldSession* session, uint64 amount, bool cashFlow /*=false*/)
@@ -2146,9 +2398,7 @@ void Guild::HandleMemberDepositMoney(WorldSession* session, uint64 amount, bool 
     _LogBankEvent(trans, cashFlow ? GUILD_BANK_LOG_CASH_FLOW_DEPOSIT : GUILD_BANK_LOG_DEPOSIT_MONEY, uint8(0), player->GetGUIDLow(), amount);
     CharacterDatabase.CommitTransaction(trans);
 
-    WorldPacket data(SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, 8);
-    data << m_bankMoney;
-    BroadcastPacket(&data);
+    _SendGuildMoney();
 
     if (player->GetSession()->HasPermission(rbac::RBAC_PERM_LOG_GM_TRADE))
     {
@@ -2189,7 +2439,7 @@ bool Guild::HandleMemberWithdrawMoney(WorldSession* session, uint64 amount, bool
     }
 
     // Update remaining money amount
-    member->UpdateBankWithdrawValue(trans, GUILD_BANK_MAX_TABS, amount);
+    member->UpdateBankWithdrawMoney(trans, amount);
     // Remove money from bank
     _ModifyBankMoney(trans, amount, false);
 
@@ -2197,8 +2447,7 @@ bool Guild::HandleMemberWithdrawMoney(WorldSession* session, uint64 amount, bool
     _LogBankEvent(trans, repair ? GUILD_BANK_LOG_REPAIR_MONEY : GUILD_BANK_LOG_WITHDRAW_MONEY, uint8(0), player->GetGUIDLow(), amount);
     CharacterDatabase.CommitTransaction(trans);
 
-    std::string aux = ByteArrayToHexStr(reinterpret_cast<uint8*>(&amount), 8, true);
-    _BroadcastEvent(GE_BANK_MONEY_CHANGED, 0, aux.c_str());
+    _SendGuildMoney();
     return true;
 }
 
@@ -2211,7 +2460,7 @@ void Guild::HandleMemberLogout(WorldSession* session)
         member->UpdateLogoutTime();
         member->ResetFlags();
     }
-    _BroadcastEvent(GE_SIGNED_OFF, player->GetGUID(), player->GetName().c_str());
+    _SendPlayerLogged(player->GetGUID(), player->GetName(), false);
 
     SaveToDB();
 }
@@ -2272,13 +2521,7 @@ void Guild::SendNewsUpdate(WorldSession* session)
 
         data.WriteBit(guid[3]);
         data.WriteBits(0, 24); // Not yet implemented used for guild achievements
-        data.WriteBit(guid[4]);
-        data.WriteBit(guid[5]);
-        data.WriteBit(guid[6]);
-        data.WriteBit(guid[0]);
-        data.WriteBit(guid[7]);
-        data.WriteBit(guid[2]);
-        data.WriteBit(guid[1]);
+        data.WriteGuidMask(guid, 4, 5, 6, 0, 7, 2, 1);
     }
 
     data.FlushBits();
@@ -2290,11 +2533,7 @@ void Guild::SendNewsUpdate(WorldSession* session)
 
         data.WriteByteSeq(guid[2]);
         data << uint32(news->GetValue());
-        data.WriteByteSeq(guid[1]);
-        data.WriteByteSeq(guid[7]);
-        data.WriteByteSeq(guid[4]);
-        data.WriteByteSeq(guid[3]);
-        data.WriteByteSeq(guid[5]);
+        data.WriteGuidBytes(guid, 1, 7, 4, 3, 5);
         data << uint32(0);
         data << uint32(news->GetType());
         data << uint32(news->GetFlags());   // 1 sticky
@@ -2344,7 +2583,7 @@ void Guild::SendPermissions(WorldSession* session) const
     data << uint32(_GetRankBankMoneyPerDay(rankId));
     data << uint32(_GetPurchasedTabsSize());
     data << uint32(_GetRankRights(rankId));
-
+    
     data.WriteBits(GUILD_BANK_MAX_TABS, 21);
     data.FlushBits();
 
@@ -2364,7 +2603,7 @@ void Guild::SendMoneyInfo(WorldSession* session) const
     if (!member)
         return;
 
-    int32 amount = _GetMemberRemainingMoney(member);
+    int64 amount = _GetMemberRemainingMoney(member);
     WorldPacket data(SMSG_GUILD_BANK_MONEY_WITHDRAWN, 8);
     data << int64(amount);
     session->SendPacket(&data);
@@ -2389,24 +2628,15 @@ void Guild::SendLoginInfo(WorldSession* session)
           SMSG_GUILD_MEMBER_DAILY_RESET // bank withdrawal reset
     */
 
-    WorldPacket data(SMSG_GUILD_EVENT, 1 + 1 + m_motd.size() + 1);
-    data << uint8(GE_MOTD);
-    data << uint8(1);
-    data << m_motd;
+    WorldPacket data(SMSG_GUILD_MOTD, 2 + m_motd.length());
+    data.WriteBits(m_motd.length(), 10);
+    data.FlushBits();
+    data.WriteString(m_motd);
     session->SendPacket(&data);
 
     TC_LOG_DEBUG("guild", "SMSG_GUILD_EVENT [%s] MOTD", session->GetPlayerInfo().c_str());
 
     SendGuildRankInfo(session);
-    _BroadcastEvent(GE_SIGNED_ON, player->GetGUID(), player->GetName().c_str());
-
-    // Send to self separately, player is not in world yet and is not found by _BroadcastEvent
-    data.Initialize(SMSG_GUILD_EVENT, 1 + 1 + player->GetName().size() + 8);
-    data << uint8(GE_SIGNED_ON);
-    data << uint8(1);
-    data << player->GetName();
-    data << uint64(player->GetGUID());
-    session->SendPacket(&data);
 
     data.Initialize(SMSG_GUILD_MEMBER_DAILY_RESET, 0);  // tells the client to request bank withdrawal limit
     session->SendPacket(&data);
@@ -2419,12 +2649,14 @@ void Guild::SendLoginInfo(WorldSession* session)
             if (entry->Level <= GetLevel())
                 player->learnSpell(entry->SpellId, true);
 
-    SendGuildReputationWeeklyCap(session, member->GetWeekReputation());
+    SendGuildReputationWeeklyCap(member);
 
     m_achievementMgr.SendAllAchievementData(player);
 
     member->SetStats(player);
     member->AddFlag(GUILDMEMBER_STATUS_ONLINE);
+    GetAchievementMgr().CheckAllAchievementCriteria(player);
+    _SendPlayerLogged(player->GetGUID(), player->GetName(), true);
 }
 
 // Loading methods
@@ -2699,9 +2931,8 @@ void Guild::MassInviteToEvent(WorldSession* session, uint32 minLevel, uint32 max
 {
     uint32 count = 0;
 
-    ByteBuffer inviteeData;
-    WorldPacket data(SMSG_CALENDAR_EVENT_INITIAL_INVITE);
-    data.WriteBits(count, 23); // count placeholder
+    WorldPacket data(SMSG_CALENDAR_FILTER_GUILD);
+    data << uint32(count); // count placeholder
 
     for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
     {
@@ -2718,35 +2949,87 @@ void Guild::MassInviteToEvent(WorldSession* session, uint32 minLevel, uint32 max
 
         if (member->GetGUID() != session->GetPlayer()->GetGUID() && level >= minLevel && level <= maxLevel && member->IsRankNotLower(minRank))
         {
-            ObjectGuid guid = member->GetGUID();
-            data.WriteBit(guid[1]);
-            data.WriteBit(guid[7]);
-            data.WriteBit(guid[5]);
-            data.WriteBit(guid[0]);
-            data.WriteBit(guid[4]);
-            data.WriteBit(guid[3]);
-            data.WriteBit(guid[6]);
-            data.WriteBit(guid[2]);
-
-            inviteeData << uint8(level);
-            inviteeData.WriteByteSeq(guid[3]);
-            inviteeData.WriteByteSeq(guid[5]);
-            inviteeData.WriteByteSeq(guid[4]);
-            inviteeData.WriteByteSeq(guid[6]);
-            inviteeData.WriteByteSeq(guid[7]);
-            inviteeData.WriteByteSeq(guid[0]);
-            inviteeData.WriteByteSeq(guid[2]);
-            inviteeData.WriteByteSeq(guid[1]);
-
+            data.appendPackGUID(member->GetGUID());
+            data << uint8(0); // unk
             ++count;
         }
     }
 
-    data.FlushBits();
-    data.PutBits(0, count, 23);
-    data.append(inviteeData);
+    data.put<uint32>(0, count);
 
     session->SendPacket(&data);
+}
+
+void Guild::_SendPlayerJoinedGuild(ObjectGuid guid, std::string name) const
+{
+    WorldPacket data(SMSG_GUILD_INVITE_ACCEPT, 11 + name.length());
+    data.WriteGuidMask(guid, 6, 1, 3);
+    data.WriteBits(name.length(), 6);
+    data.WriteGuidMask(guid, 7, 4, 2, 5, 0);
+
+    data.WriteGuidBytes(guid, 2, 4, 1, 6, 5);
+    data << (int32)0; // unk int32
+    data.WriteGuidBytes(guid, 3, 0);
+    data.WriteString(name);
+    data.WriteByteSeq(guid[7]);
+    BroadcastPacket(&data);
+}
+
+void Guild::_SendPlayerLogged(ObjectGuid guid, std::string name, bool online) const
+{
+    WorldPacket data(SMSG_GUILD_MEMBER_LOGGED, 11 + name.length());
+    data.WriteGuidMask(guid, 0, 6);
+    data.WriteBit(0); // unk bool
+    data.WriteGuidMask(guid, 2, 5, 3);
+    data.WriteBits(name.length(), 6);
+    data.WriteGuidMask(guid, 1, 7, 4);
+    data.WriteBit(online); // logged in
+
+    data.WriteGuidBytes(guid, 3, 2, 0);
+    data << (int32)0; // unk int32
+    data.WriteByteSeq(guid[6]);
+    data.WriteString(name);
+    data.WriteGuidBytes(guid, 4, 5, 7, 1);
+
+    BroadcastPacket(&data);
+}
+
+void Guild::_SendRemovePlayerFromGuild(ObjectGuid removedGuid, std::string removedName, ObjectGuid kickerGuid /*= 0*/, std::string kickerName /*= ""*/) const
+{
+    bool kicked = ((uint64)kickerGuid > (uint64)0);
+
+    WorldPacket data(SMSG_GUILD_LEAVE, 8 + 4 + 1 + 1 + removedName.length() + (kicked ? (8 + 4 + 1 + 1 + kickerName.length()) : 0));
+    data.WriteBit(removedGuid[2]);
+    data.WriteBits(removedName.length(), 6);
+    data.WriteGuidMask(removedGuid, 6, 5);
+    data.WriteBit(kicked);
+
+    if (kicked)
+    {
+        data.WriteBit(0); // unk bool
+        data.WriteBit(0); // unk bool
+        data.WriteBits(kickerName.length(), 6);
+        data.WriteGuidMask(kickerGuid, 1, 3, 4, 2, 5, 7, 6, 0);
+
+        data.WriteBit(0);
+    }
+
+    data.WriteGuidMask(removedGuid, 1, 0, 3, 4, 7);
+
+    data.FlushBits();
+    if (kicked)
+    {
+        data.WriteGuidBytes(kickerGuid, 1, 3, 5, 2, 0, 4, 6, 7);
+        data.WriteString(kickerName);
+        data << (int32)0;
+    }
+
+    data.WriteString(removedName);
+    data.WriteByteSeq(removedGuid[1]);
+    data << (int32)0;
+    data.WriteGuidBytes(removedGuid, 0, 4, 2, 3, 6, 5, 7);
+
+    BroadcastPacket(&data);
 }
 
 // Members handling
@@ -2781,8 +3064,9 @@ bool Guild::AddMember(uint64 guid, uint8 rankId)
         player->SetGuildIdInvited(0);
         player->SetRank(rankId);
         player->SetGuildLevel(GetLevel());
-        SendLoginInfo(player->GetSession());
         name = player->GetName();
+        _SendPlayerJoinedGuild(guid, name);
+        SendLoginInfo(player->GetSession());
     }
     else
     {
@@ -2801,8 +3085,7 @@ bool Guild::AddMember(uint64 guid, uint8 rankId)
                 fields[1].GetUInt8(),
                 fields[2].GetUInt8(),
                 fields[3].GetUInt16(),
-                fields[4].GetUInt32(),
-                0);
+                fields[4].GetUInt32());
 
             ok = member->CheckStats();
         }
@@ -2813,6 +3096,9 @@ bool Guild::AddMember(uint64 guid, uint8 rankId)
             return false;
         }
         m_members[lowguid] = member;
+
+        _SendPlayerJoinedGuild(guid, name);
+        _SendPlayerLogged(guid, name, false);
     }
 
     SQLTransaction trans(NULL);
@@ -2820,7 +3106,6 @@ bool Guild::AddMember(uint64 guid, uint8 rankId)
 
     _UpdateAccountsNumber();
     _LogEvent(GUILD_EVENT_LOG_JOIN_GUILD, lowguid);
-    _BroadcastEvent(GE_JOINED, guid, name.c_str());
     sGuildFinderMgr->RemoveAllMembershipRequestsFromPlayer(lowguid);
 
     // Call scripts if member was succesfully added (and stored to database)
@@ -2883,10 +3168,26 @@ void Guild::DeleteMember(uint64 guid, bool isDisbanding, bool isKicked, bool can
         player->SetRank(0);
         player->SetGuildLevel(0);
 
+        // Reset Guild Reputation
+        player->SetReputation(GUILD_FACTION_ID, 0);
+        SQLTransaction trans = CharacterDatabase.BeginTransaction();
+        player->GetReputationMgr().SaveToDB(trans);
+        CharacterDatabase.CommitTransaction(trans);
+
         for (uint32 i = 0; i < sGuildPerkSpellsStore.GetNumRows(); ++i)
             if (GuildPerkSpellsEntry const* entry = sGuildPerkSpellsStore.LookupEntry(i))
                 if (entry->Level <= GetLevel())
                     player->removeSpell(entry->SpellId, false, false);
+    }
+    else
+    {
+        // Reset Guild Reputation offline
+        PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_UPD_CHAR_REP_FACTION_CHANGE);
+        stmt->setUInt16(0, GUILD_FACTION_ID);
+        stmt->setInt32(1, 0);
+        stmt->setUInt16(2, GUILD_FACTION_ID);
+        stmt->setUInt32(3, lowguid);
+        CharacterDatabase.Execute(stmt);
     }
 
     _DeleteMemberFromDB(lowguid);
@@ -3116,6 +3417,9 @@ inline uint32 Guild::_GetRankRights(uint8 rankId) const
 
 inline int32 Guild::_GetRankBankMoneyPerDay(uint8 rankId) const
 {
+    if (rankId == GR_GUILDMASTER)
+        return GUILD_WITHDRAW_MONEY_UNLIMITED;
+
     if (const RankInfo* rankInfo = GetRankInfo(rankId))
         return rankInfo->GetBankMoneyPerDay();
     return 0;
@@ -3153,7 +3457,7 @@ inline int32 Guild::_GetMemberRemainingSlots(Member const* member, uint8 tabId) 
     return 0;
 }
 
-inline int32 Guild::_GetMemberRemainingMoney(Member const* member) const
+inline int64 Guild::_GetMemberRemainingMoney(Member const* member) const
 {
     if (member)
     {
@@ -3163,7 +3467,7 @@ inline int32 Guild::_GetMemberRemainingMoney(Member const* member) const
 
         if ((_GetRankRights(rankId) & (GR_RIGHT_WITHDRAW_REPAIR | GR_RIGHT_WITHDRAW_GOLD)) != 0)
         {
-            int32 remaining = _GetRankBankMoneyPerDay(rankId) - member->GetBankWithdrawValue(GUILD_BANK_MAX_TABS);
+            int64 remaining = int64(_GetRankBankMoneyPerDay(rankId) * GOLD) - member->GetBankWithdrawMoney();
             if (remaining > 0)
                 return remaining;
         }
@@ -3178,7 +3482,7 @@ inline void Guild::_UpdateMemberWithdrawSlots(SQLTransaction& trans, uint64 guid
         uint8 rankId = member->GetRankId();
         if (rankId != GR_GUILDMASTER
             && member->GetBankWithdrawValue(tabId) < _GetRankBankTabSlotsPerDay(rankId, tabId))
-            member->UpdateBankWithdrawValue(trans, tabId, 1);
+            member->UpdateBankWithdrawValue(trans, tabId);
     }
 }
 
@@ -3381,47 +3685,45 @@ void Guild::_SendBankContentUpdate(uint8 tabId, SlotIds slots) const
     if (BankTab const* tab = GetBankTab(tabId))
     {
         ByteBuffer tabData;
-
-        WorldPacket data(SMSG_GUILD_BANK_LIST, 500);                                // guess size
+        WorldPacket data(SMSG_GUILD_BANK_LIST, 1200);
         data << uint32(tabId);
         data << uint64(m_bankMoney);
-
         size_t pos = data.wpos();
-        data << uint32(0);                                                          // item withdrawal limit placeholder
-
-        data.WriteBit(0);                                                           // not a full update
-        data.WriteBits(0, 21);                                                      // tab count (doesn't need to be sent here)
-        data.WriteBits(slots.size(), 18);                                           // item count
+        data << uint32(0);                                      // Item withdraw amount, will be filled later
+        data.WriteBit(0);
+        data.WriteBits(0, 21);                                  // Tab count
+        data.WriteBits(slots.size(), 18);                       // Item count
 
         for (SlotIds::const_iterator itr = slots.begin(); itr != slots.end(); ++itr)
         {
             Item const* tabItem = tab->GetItem(*itr);
-
-            tabData << uint32(0);
-            tabData << uint32(0);
-
             uint32 enchants = 0;
+            tabData << uint32(0);
+            tabData << uint32(0);
 
             if (tabItem)
-                for (uint32 ench = 0; ench < MAX_ENCHANTMENT_SLOT; ++ench)
+            {
+                for (uint32 ench = 1; ench < MAX_ENCHANTMENT_SLOT; ++ench)
+                {
                     if (uint32 enchantId = tabItem->GetEnchantmentId(EnchantmentSlot(ench)))
                     {
-                        tabData << uint32(enchantId);
                         tabData << uint32(ench);
+                        tabData << uint32(enchantId);
                         ++enchants;
                     }
+                }
+            }
 
             data.WriteBit(0);                                                       // Locked
             data.WriteBits(enchants, 21);
-
-            tabData << uint32(0);
+            tabData << uint32(tabItem ? tabItem->GetEnchantmentId(EnchantmentSlot(PERM_ENCHANTMENT_SLOT)) : 0);
             tabData << uint32(0);                                                   // Size size - mods
-            tabData << uint32(tabItem ? tabItem->GetEntry() : 0);                   // ITEM_FIELD_STACK_COUNT
+            tabData << uint32(tabItem ? tabItem->GetEntry() : 0);
             tabData << uint32(tabItem ? abs(tabItem->GetSpellCharges()) : 0);       // Spell charges
-            tabData << uint32(tabItem ? tabItem->GetCount() : 0);
-            tabData << uint32(*itr);
+            tabData << uint32(tabItem ? tabItem->GetCount() : 0);                   // ITEM_FIELD_STACK_COUNT
+            tabData << uint32(*itr);                                                // Slot ID
             tabData << uint32(tabItem ? tabItem->GetItemRandomPropertyId() : 0);
-            tabData << uint32(tabItem ?tabItem->GetItemSuffixFactor() : 0);         // SuffixFactor
+            tabData << uint32(tabItem ? tabItem->GetItemSuffixFactor() : 0);        // SuffixFactor
         }
 
         data.FlushBits();
@@ -3430,12 +3732,16 @@ void Guild::_SendBankContentUpdate(uint8 tabId, SlotIds slots) const
             data.append(tabData);
 
         for (Members::const_iterator itr = m_members.begin(); itr != m_members.end(); ++itr)
+        {
             if (_MemberHasTabRights(itr->second->GetGUID(), tabId, GUILD_BANK_RIGHT_VIEW_TAB))
+            {
                 if (Player* player = itr->second->FindPlayer())
                 {
                     data.put<uint32>(pos, uint32(_GetMemberRemainingSlots(itr->second, tabId)));
                     player->GetSession()->SendPacket(&data);
                 }
+            }
+        }
 
         TC_LOG_DEBUG("guild", "WORLD: Sent (SMSG_GUILD_BANK_LIST)");
     }
@@ -3443,26 +3749,26 @@ void Guild::_SendBankContentUpdate(uint8 tabId, SlotIds slots) const
 
 void Guild::_BroadcastEvent(GuildEvents guildEvent, uint64 guid, const char* param1, const char* param2, const char* param3) const
 {
-    uint8 count = !param3 ? (!param2 ? (!param1 ? 0 : 1) : 2) : 3;
+    //uint8 count = !param3 ? (!param2 ? (!param1 ? 0 : 1) : 2) : 3;
 
-    WorldPacket data(SMSG_GUILD_EVENT, 1 + 1 + count + (guid ? 8 : 0));
-    data << uint8(guildEvent);
-    data << uint8(count);
+    //WorldPacket data(SMSG_GUILD_EVENT, 1 + 1 + count + (guid ? 8 : 0));
+    //data << uint8(guildEvent);
+    //data << uint8(count);
 
-    if (param3)
-        data << param1 << param2 << param3;
-    else if (param2)
-        data << param1 << param2;
-    else if (param1)
-        data << param1;
+    //if (param3)
+    //    data << param1 << param2 << param3;
+    //else if (param2)
+    //    data << param1 << param2;
+    //else if (param1)
+    //    data << param1;
 
-    if (guid)
-        data << uint64(guid);
+    //if (guid)
+    //    data << uint64(guid);
 
-    BroadcastPacket(&data);
+    //BroadcastPacket(&data);
 
-    if (sLog->ShouldLog("guild", LOG_LEVEL_DEBUG))
-        TC_LOG_DEBUG("guild", "SMSG_GUILD_EVENT [Broadcast] Event: %s (%u)", _GetGuildEventString(guildEvent).c_str(), guildEvent);
+    //if (sLog->ShouldLog("guild", LOG_LEVEL_DEBUG))
+    //    TC_LOG_DEBUG("guild", "SMSG_GUILD_EVENT [Broadcast] Event: %s (%u)", _GetGuildEventString(guildEvent).c_str(), guildEvent);
 }
 
 void Guild::SendBankList(WorldSession* session, uint8 tabId, bool withContent, bool withTabInfo) const
@@ -3471,6 +3777,7 @@ void Guild::SendBankList(WorldSession* session, uint8 tabId, bool withContent, b
     if (!member) // Shouldn't happen, just in case
         return;
 
+    ByteBuffer contentData;
     ByteBuffer tabData;
     WorldPacket data(SMSG_GUILD_BANK_LIST, 500);
     data << uint32(tabId);
@@ -3487,13 +3794,18 @@ void Guild::SendBankList(WorldSession* session, uint8 tabId, bool withContent, b
 
     data.WriteBits(withTabInfo ? _GetPurchasedTabsSize() : 0, 21);
     data.WriteBits(itemCount, 18);
-
+    
     if (withTabInfo)
     {
         for (uint8 i = 0; i < _GetPurchasedTabsSize(); ++i)
         {
-            data.WriteBits(m_bankTabs[i]->GetIcon().length(), 9);
+            data.WriteBits(m_bankTabs[i]->GetIcon().length() / 2, 8);
+            data.WriteBit(m_bankTabs[i]->GetIcon().length() % 2);
             data.WriteBits(m_bankTabs[i]->GetName().length(), 7);
+
+            tabData << uint32(i); // Bank Tab
+            tabData.WriteString(m_bankTabs[i]->GetIcon());
+            tabData.WriteString(m_bankTabs[i]->GetName());
         }
     }
 
@@ -3505,32 +3817,30 @@ void Guild::SendBankList(WorldSession* session, uint8 tabId, bool withContent, b
             {
                 if (Item* tabItem = tab->GetItem(slotId))
                 {
-
-                    tabData << uint32(0);
-                    tabData << uint32(0);
-
                     uint32 enchants = 0;
-                    for (uint32 ench = 0; ench < MAX_ENCHANTMENT_SLOT; ++ench)
+                    contentData << uint32(0);
+                    contentData << uint32(0);
+
+                    for (uint32 ench = 1; ench < MAX_ENCHANTMENT_SLOT; ++ench)
                     {
                         if (uint32 enchantId = tabItem->GetEnchantmentId(EnchantmentSlot(ench)))
                         {
-                            tabData << uint32(enchantId);
-                            tabData << uint32(ench);
+                            contentData << uint32(ench);
+                            contentData << uint32(enchantId);
                             ++enchants;
                         }
                     }
 
-                    data.WriteBit(0);                                       // Locked
+                    data.WriteBit(0);                                           // Locked
                     data.WriteBits(enchants, 21);
-
-                    tabData << uint32(0);
-                    tabData << uint32(0);                                   // Size size - mods
-                    tabData << uint32(tabItem->GetEntry());                 // ITEM_FIELD_STACK_COUNT
-                    tabData << uint32(abs(tabItem->GetSpellCharges()));     // Spell charges
-                    tabData << uint32(tabItem->GetCount());
-                    tabData << uint32(slotId);
-                    tabData << uint32(tabItem->GetItemRandomPropertyId());
-                    tabData << uint32(tabItem->GetItemSuffixFactor());      // SuffixFactor
+                    contentData << uint32(tabItem->GetEnchantmentId(EnchantmentSlot(PERM_ENCHANTMENT_SLOT)));
+                    contentData << uint32(0);                                   // some weird string length
+                    contentData << uint32(tabItem->GetEntry());
+                    contentData << uint32(abs(tabItem->GetSpellCharges()));     // Spell charges
+                    contentData << uint32(tabItem->GetCount());                 // ITEM_FIELD_STACK_COUNT
+                    contentData << uint32(slotId);
+                    contentData << uint32(tabItem->GetItemRandomPropertyId());
+                    contentData << uint32(tabItem->GetItemSuffixFactor());      // SuffixFactor
                 }
             }
         }
@@ -3538,18 +3848,11 @@ void Guild::SendBankList(WorldSession* session, uint8 tabId, bool withContent, b
 
     data.FlushBits();
 
+    if (!contentData.empty())
+        data.append(contentData);
+
     if (!tabData.empty())
         data.append(tabData);
-
-    if (withTabInfo)
-    {
-        for (uint8 i = 0; i < _GetPurchasedTabsSize(); ++i)
-        {
-            data << uint32(i);
-            data.WriteString(m_bankTabs[i]->GetIcon());
-            data.WriteString(m_bankTabs[i]->GetName());
-        }
-    }
 
     session->SendPacket(&data);
 
@@ -3565,19 +3868,13 @@ void Guild::SendGuildRanksUpdate(uint64 setterGuid, uint64 targetGuid, uint32 ra
     ASSERT(member);
 
     WorldPacket data(SMSG_GUILD_RANKS_UPDATE, 100);
-    data.WriteBit(tarGuid[5]);
-    data.WriteBit(tarGuid[6]);
-    data.WriteBit(setGuid[0]);
-    data.WriteBit(setGuid[1]);
+    data.WriteGuidMask(tarGuid, 5, 6);
+    data.WriteGuidMask(setGuid, 0, 1);
     data.WriteBit(tarGuid[3]);
     data.WriteBit(setGuid[4]);
     data.WriteBit(tarGuid[2]);
-    data.WriteBit(setGuid[6]);
-    data.WriteBit(setGuid[3]);
-    data.WriteBit(setGuid[7]);
-    data.WriteBit(tarGuid[4]);
-    data.WriteBit(tarGuid[0]);
-    data.WriteBit(tarGuid[1]);
+    data.WriteGuidMask(setGuid, 6, 3, 7);
+    data.WriteGuidMask(tarGuid, 4, 0, 1);
     data.WriteBit(setGuid[2]);
     data.WriteBit(tarGuid[7]);
     data.WriteBit(rank < member->GetRankId()); // 1 == higher, 0 = lower?
@@ -3587,19 +3884,14 @@ void Guild::SendGuildRanksUpdate(uint64 setterGuid, uint64 targetGuid, uint32 ra
 
     data.WriteByteSeq(tarGuid[2]);
     data.WriteByteSeq(setGuid[1]);
-    data.WriteByteSeq(tarGuid[6]);
-    data.WriteByteSeq(tarGuid[1]);
-    data.WriteByteSeq(tarGuid[5]);
+    data.WriteGuidBytes(tarGuid, 6, 1, 5);
     data.WriteByteSeq(setGuid[0]);
     data << uint32(rank);
-    data.WriteByteSeq(setGuid[3]);
-    data.WriteByteSeq(setGuid[7]);
+    data.WriteGuidBytes(setGuid, 3, 7);
     data.WriteByteSeq(tarGuid[7]);
     data.WriteByteSeq(setGuid[2]);
-    data.WriteByteSeq(tarGuid[3]);
-    data.WriteByteSeq(tarGuid[4]);
-    data.WriteByteSeq(setGuid[6]);
-    data.WriteByteSeq(setGuid[5]);
+    data.WriteGuidBytes(tarGuid, 3, 4);
+    data.WriteGuidBytes(setGuid, 6, 5);
     data.WriteByteSeq(tarGuid[0]);
     data.WriteByteSeq(setGuid[4]);
     BroadcastPacket(&data);
@@ -3615,8 +3907,6 @@ void Guild::GiveXP(uint32 xp, Player* source)
     if (!sWorld->getBoolConfig(CONFIG_GUILD_LEVELING_ENABLED))
         return;
 
-    /// @todo: Award reputation and count activity for player
-
     if (GetLevel() >= sWorld->getIntConfig(CONFIG_GUILD_MAX_LEVEL))
         xp = 0; // SMSG_GUILD_XP_GAIN is always sent, even for no gains
 
@@ -3629,6 +3919,11 @@ void Guild::GiveXP(uint32 xp, Player* source)
 
     _experience += xp;
     _todayExperience += xp;
+
+    if (Member* member = GetMember(source->GetGUID()))
+        member->AddActivity(xp);
+
+    SendGuildXP(source->GetSession());
 
     if (!xp)
         return;
@@ -3678,14 +3973,18 @@ void Guild::SendGuildXP(WorldSession* session /* = NULL */) const
     session->SendPacket(&data);
 }
 
-void Guild::SendGuildReputationWeeklyCap(WorldSession* session, uint32 reputation) const
+void Guild::SendGuildReputationWeeklyCap(Member* member) const
 {
-    uint32 cap = sWorld->getIntConfig(CONFIG_GUILD_WEEKLY_REP_CAP) - reputation;
+    Player* player = member->FindPlayer();
+    if (!player)
+        return;
+
+    uint32 cap = sWorld->getIntConfig(CONFIG_GUILD_WEEKLY_REP_CAP) - member->GetWeekReputation();
     WorldPacket data(SMSG_GUILD_REPUTATION_WEEKLY_CAP, 4);
     data << uint32(cap);
-    session->SendPacket(&data);
+    player->GetSession()->SendPacket(&data);
     TC_LOG_DEBUG("guild", "SMSG_GUILD_REPUTATION_WEEKLY_CAP [%s]: Left: %u",
-                   session->GetPlayerInfo().c_str(), cap);
+        player->GetSession()->GetPlayerInfo().c_str(), cap);
 }
 
 void Guild::ResetTimes(bool weekly)
@@ -3755,6 +4054,25 @@ void Guild::HandleNewsSetSticky(WorldSession* session, uint32 newsId, bool stick
     ByteBuffer buffer;
     news->WritePacket(data, buffer);
     session->SendPacket(&data);
+}
+
+void Guild::GiveReputationToMember(uint32 reputation, Player* player)
+{
+    Member* member = GetMember(player->GetGUID());
+    if (!member)
+        return;
+
+    AddPct(reputation, player->GetMaxPositiveAuraModifier(SPELL_AURA_MOD_GUILD_REPUTATION_GAIN_PCT)); // Guild Tabard
+    reputation = std::min(reputation, sWorld->getIntConfig(CONFIG_GUILD_WEEKLY_REP_CAP) - member->GetWeekReputation());
+    if (player->GetReputation(GUILD_FACTION_ID) + reputation >= uint32(ReputationMgr::Reputation_Cap))
+        reputation = ReputationMgr::Reputation_Cap - player->GetReputation(GUILD_FACTION_ID);
+
+    if (!reputation)
+        return;
+
+    player->GetReputationMgr().ModifyReputation(sFactionStore.LookupEntry(GUILD_FACTION_ID), reputation);
+    member->AddReputation(reputation);
+    SendGuildReputationWeeklyCap(member);
 }
 
 void Guild::HandleSetBankTabNote(WorldSession* session, uint32 tabId, std::string note)

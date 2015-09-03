@@ -53,7 +53,7 @@ enum StableResultCode
 void WorldSession::SendTabardVendorActivate(uint64 guid)
 {
     ObjectGuid Guid = guid;
-    WorldPacket data(SMSG_TABARD_VENDOR_ACTIVATE, 8);
+    WorldPacket data(SMSG_TABARDVENDOR_ACTIVATE, 8);
 
     data.WriteBit(Guid[1]);
     data.WriteBit(Guid[5]);

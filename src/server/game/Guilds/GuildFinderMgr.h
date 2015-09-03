@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2011-2015 Project SkyFire <http://www.projectskyfire.org/>
  * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2015 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2014 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -17,8 +16,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef SF_GUILDFINDER_H
-#define SF_GUILDFINDER_H
+#ifndef __TRINITY_GUILDFINDER_H
+#define __TRINITY_GUILDFINDER_H
 
 #include <ace/Singleton.h>
 #include "Common.h"
@@ -86,7 +85,7 @@ struct MembershipRequest
         uint8 GetClass() const         { return sWorld->GetCharacterNameData(GetPlayerGUID())->m_class; }
         uint8 GetLevel() const         { return sWorld->GetCharacterNameData(GetPlayerGUID())->m_level; }
         time_t GetSubmitTime() const   { return _time; }
-        time_t GetExpiryTime() const   { return time_t(_time + 30 * 24 * 3600); } // Adding 30 days
+        time_t GetExpiryTime() const   { return time_t(_time + 28 * 24 * 3600); } // Adding 28 days
         std::string const& GetComment() const { return _comment; }
         std::string const& GetName() const    { return sWorld->GetCharacterNameData(GetPlayerGUID())->m_name; }
     private:

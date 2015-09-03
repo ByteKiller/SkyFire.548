@@ -1480,7 +1480,7 @@ void WorldSession::HandleInspectOpcode(WorldPacket& recvData)
     }
 
     uint32 talent_points = 41;
-    WorldPacket data(SMSG_INSPECT_RESULTS, 8 + 4 + 1 + 1 + talent_points + 8 + 4 + 8 + 4);
+    WorldPacket data(SMSG_INSPECT, 8 + 4 + 1 + 1 + talent_points + 8 + 4 + 8 + 4);
     data << player->GetGUID();
 
     if (sWorld->getBoolConfig(CONFIG_TALENTS_INSPECTING) || _player->IsGameMaster())
@@ -2561,3 +2561,16 @@ void WorldSession::HandleSelectFactionOpcode(WorldPacket& recvPacket)
 
     _player->SendMovieStart(116);
 }
+
+void WorldSession::HandleSetPreferedCemetery(WorldPacket& recvData)
+{
+    TC_LOG_DEBUG("network", "WORLD: Received CMSG_SET_PREFERED_CEMETERY");
+
+    uint32 CemeteryId;
+    recvData >> CemeteryId;
+}
+
+//void WorldSession::HandleCemeteryListRequest(WorldPacket& recvPacket)
+//{
+//    GetPlayer()->SendCemeteryList(false);
+//}

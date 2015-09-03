@@ -69,12 +69,13 @@ void CalendarMgr::LoadFromDB()
             int32 dungeonId         = fields[5].GetInt32();
             uint32 eventTime        = fields[6].GetUInt32();
             uint32 flags            = fields[7].GetUInt32();
+            uint32 timezone         = fields[8].GetUInt32();
             uint32 guildId = 0;
 
             if (flags & CALENDAR_FLAG_GUILD_EVENT || flags & CALENDAR_FLAG_WITHOUT_INVITES)
                 guildId = Player::GetGuildIdFromDB(creatorGUID);
 
-            CalendarEvent* calendarEvent = new CalendarEvent(eventId, creatorGUID, guildId, type, dungeonId, time_t(eventTime), flags, title, description);
+            CalendarEvent* calendarEvent = new CalendarEvent(eventId, creatorGUID, guildId, type, dungeonId, time_t(eventTime), flags, timezone, title, description);
             _events.insert(calendarEvent);
 
             _maxEventId = std::max(_maxEventId, eventId);
@@ -128,12 +129,13 @@ void CalendarMgr::AddEvent(CalendarEvent* calendarEvent, CalendarSendEventType s
     SendCalendarEvent(calendarEvent->GetCreatorGUID(), *calendarEvent, sendType);
 }
 
-void CalendarMgr::AddInvite(CalendarEvent* calendarEvent, CalendarInvite* invite, bool sendEventInvitePacket /*= true*/)
+void CalendarMgr::AddInvite(CalendarEvent* calendarEvent, CalendarInvite* invite)
 {
-    if (sendEventInvitePacket)
+    if (!calendarEvent->IsGuildAnnouncement())
         SendCalendarEventInvite(*invite);
 
-    SendCalendarEventInviteAlert(*calendarEvent, *invite);
+    if (!calendarEvent->IsGuildEvent() || invite->GetInviteeGUID() == calendarEvent->GetCreatorGUID())
+        SendCalendarEventInviteAlert(*calendarEvent, *invite);
 
     if (!calendarEvent->IsGuildAnnouncement())
     {

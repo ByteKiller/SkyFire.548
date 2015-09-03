@@ -36,6 +36,7 @@
 #include "Object.h"
 
 class Creature;
+class CharacterBooster;
 class GameObject;
 class InstanceSave;
 class Item;
@@ -138,6 +139,68 @@ enum BarberShopResult
     /*BARBER_SHOP_NOT_ENOUGH_MONEY = 3*/
 };
 
+enum DB2Hash : uint64
+{
+    DB2_REPLY_BattlePetAbility            = 3416538071,
+    DB2_REPLY_BattlePetAbilityEffect      = 3716901134,
+    DB2_REPLY_BattlePetAbilityState       = 1012231747,
+    DB2_REPLY_BattlePetAbilityTurn        = 3973639388,
+    DB2_REPLY_BattlePetBreedQuality       = 458903206,
+    DB2_REPLY_BattlePetBreedState         = 1794847238,
+    DB2_REPLY_BattlePetEffectProperties   = 1672791226,
+    DB2_REPLY_BattlePetNPCTeamMember      = 4060454394,
+    DB2_REPLY_BattlePetSpecies            = 1821637041,
+    DB2_REPLY_BattlePetSpeciesState       = 366509520,
+    DB2_REPLY_BattlePetSpeciesXAbility    = 1143173908,
+    DB2_REPLY_BattlePetState              = 2403627824,
+    DB2_REPLY_BattlePetVisual             = 3282955075,
+    DB2_REPLY_BroadcastText               = 35137211,
+    DB2_REPLY_Creature                    = 3386291891,
+    DB2_REPLY_CreatureDifficulty          = 3386943305, // MoP - 5.4.0
+    DB2_REPLY_Curve                       = 1272569722, // MoP - 5.4.0
+    DB2_REPLY_CurvePoint                  = 1880017466, // MoP - 5.4.0
+    DB2_REPLY_DeviceBlacklist             = 983446676,  // MoP - 5.4.2
+    DB2_REPLY_DriverBlacklist             = 1326512502, // MoP - 5.4.2
+    DB2_REPLY_GameObjects                 = 331613093,
+    DB2_REPLY_Item                        = 1344507586,
+    DB2_REPLY_Item_sparse                 = 2442913102,
+    DB2_REPLY_ItemCurrencyCost            = 1876974313,
+    DB2_REPLY_ItemExtendedCost            = 3146089301,
+    DB2_REPLY_ItemToBattlePet             = 1563357608, // MoP - 5.4.2 (replaced by ItemToBattlePetSpecies in WoD)
+    DB2_REPLY_ItemToMountSpell            = 1440631488, // MoP - 5.4.2
+    DB2_REPLY_ItemUpgrade                 = 1879459387,
+    DB2_REPLY_KeyChain                    = 1837770388,
+    DB2_REPLY_Locale                      = 1065724855,
+    DB2_REPLY_Location                    = 961296167,
+    DB2_REPLY_MapChallengeMode            = 943410215,
+    DB2_REPLY_MarketingPromotionsXLocale  = 2715021741,
+    DB2_REPLY_Path                        = 2499044245,
+    DB2_REPLY_PathNode                    = 1000230050,
+    DB2_REPLY_PathNodeProperty            = 4263624740,
+    DB2_REPLY_PathProperty                = 149245792,
+    DB2_REPLY_QuestPackageItem            = 3425666288,
+    DB2_REPLY_RulesetItemUpgrade          = 1840711788,
+    DB2_REPLY_RulesetRaidLootUpgrade      = 3978279757,
+    DB2_REPLY_SceneScript                 = 3568395212,
+    DB2_REPLY_SceneScriptPackage          = 3905641993,
+    DB2_REPLY_SceneScriptPackageMember    = 3830298396,
+    DB2_REPLY_SpellEffectCameraShakes     = 1939361897, // MoP - 5.4.0
+    DB2_REPLY_SpellMissile                = 1754233351, // MoP - 5.4.0
+    DB2_REPLY_SpellMissileMotion          = 930182777,  // MoP - 5.4.0
+    DB2_REPLY_SpellReagents               = 2875640223, // MoP - 5.2.0
+    DB2_REPLY_SpellVisual                 = 4146370265, // MoP - 5.4.0
+    DB2_REPLY_SpellVisualEffectName       = 48336690,   // MoP - 5.4.0
+    DB2_REPLY_SpellVisualKit              = 4102286043, // MoP - 5.4.0
+    DB2_REPLY_SpellVisualKitAreaModel     = 22642299461,// MoP - 5.4.0
+    DB2_REPLY_SpellVisualKitModelAttach   = 4033975491, // MoP - 5.4.0
+    DB2_REPLY_SpellVisualMissile          = 1369604944, // MoP - 5.4.0
+    DB2_REPLY_Vignette                    = 4021368146, // MoP - 5.4.0
+    DB2_REPLY_WbAccessControlList         = 1477136115, // MoP - 5.3.0
+    DB2_REPLY_WbCertBlacklist             = 3450573023, // MoP - 5.3.0
+    DB2_REPLY_WbCertWhitelist             = 2287306173, // MoP - 5.3.0
+    DB2_REPLY_WbPermissions               = 4163366139, // MoP - 5.3.0
+};
+
 #define DB2_REPLY_BROADCAST 35137211
 #define DB2_REPLY_SPARSE    2442913102
 #define DB2_REPLY_ITEM      1344507586
@@ -210,6 +273,40 @@ class CharacterCreateInfo
         uint8 CharCount;
 };
 
+// Pets into memory
+struct PetSlots
+{
+    void clean_start()
+    {
+        entry = 0;
+        pettemplate = 0;
+        guid = 0;
+        namelen = 0;
+        slot = 0;
+        slottype = 0;
+        level = 0;
+        name = "";
+        petType = 1;
+        SetDisplayId = 0;
+        SetSpecializationId = 0;
+    }
+
+    uint32 entry;
+    uint32 pettemplate;
+    uint64 guid;
+    uint8 namelen;
+    uint8 slot;
+    uint8 slottype;
+    uint8 level;
+    uint8 petType = 1;
+    uint32 SetDisplayId;
+    uint32 SetSpecializationId;
+    std::string name;
+};
+
+typedef std::unordered_map<uint8, PetSlots> PetSlotsList;
+
+
 /// Player session in the World
 class WorldSession
 {
@@ -257,6 +354,18 @@ class WorldSession
         std::string const& GetRemoteAddress() { return m_Address; }
         void SetPlayer(Player* player);
         uint8 Expansion() const { return m_expansion; }
+
+        // Pets in memory system
+        PetSlotsList    m_petslist;
+
+        bool addPet(uint8 slot, uint32 entry, uint32 pettemplate, uint64 guid, uint8 petlevel, std::string name, bool checking = false);
+        bool addPet(uint8 slot, PetSlots PetToSave, bool checking = false);
+        bool delPet(uint8 slot);
+        bool delPet(Unit* pet_entry);
+        bool movePet(uint8 slot, uint32 entry);
+        PetSlots checkPets(uint8 slot, uint32 entry);
+        PetSlots savePet(uint8 slot);
+        uint8 CheckEmptyPetSlot(Player* owner);
 
         void InitWarden(BigNumber* k, std::string const& os);
 
@@ -316,12 +425,9 @@ class WorldSession
         // Spell
         void HandleClientCastFlags(WorldPacket& recvPacket, uint8 castFlags, SpellCastTargets & targets);
 
-        // Pet
-        void SendPetNameQuery(ObjectGuid guid, uint64 petNumber);
-        void SendStablePet(uint64 guid);
-        void SendStablePetCallback(PreparedQueryResult result, uint64 guid);
-        void SendStableResult(uint8 guid);
-        bool CheckStableMaster(uint64 guid);
+        // Cemetery
+        void HandleSetPreferedCemetery(WorldPacket& recvData);
+        void HandleCemeteryListRequest(WorldPacket& recvData);
 
         // Account Data
         AccountData* GetAccountData(AccountDataType type) { return &m_accountData[type]; }
@@ -399,6 +505,10 @@ class WorldSession
         uint32 GetRecruiterId() const { return recruiterId; }
         bool IsARecruiter() const { return isRecruiter; }
 
+        // Boost
+        bool HasBoost() const { return m_hasBoost; }
+        void SetBoosting(bool boost, bool saveToDB = true);
+
         z_stream_s* GetCompressionStream() { return _compressionStream; }
 
     public:                                                 // opcodes handlers
@@ -470,6 +580,8 @@ class WorldSession
         void HandleLogoutCancelOpcode(WorldPacket& recvPacket);
 
         // GM Ticket opcodes
+        void HandleSubmitBugOpcode(WorldPacket & recvPacket);
+        void HandleSubmitSuggestionOpcode(WorldPacket & recvPacket);
         void HandleGMTicketCreateOpcode(WorldPacket& recvPacket);
         void HandleGMTicketUpdateOpcode(WorldPacket& recvPacket);
         void HandleGMTicketDeleteOpcode(WorldPacket& recvPacket);
@@ -585,6 +697,7 @@ class WorldSession
         void HandleGuildLeaveOpcode(WorldPacket& recvPacket);
         void HandleGuildDisbandOpcode(WorldPacket& recvPacket);
         void HandleGuildSetGuildMaster(WorldPacket& recvPacket);
+        void HandleGuildReplaceGuildMaster(WorldPacket& recvPacket);
         void HandleGuildMOTDOpcode(WorldPacket& recvPacket);
         void HandleGuildNewsUpdateStickyOpcode(WorldPacket& recvPacket);
         void HandleGuildSetNoteOpcode(WorldPacket& recvPacket);
@@ -593,6 +706,8 @@ class WorldSession
         void HandleGuildSetRankPermissionsOpcode(WorldPacket& recvPacket);
         void HandleGuildAddRankOpcode(WorldPacket& recvPacket);
         void HandleGuildDelRankOpcode(WorldPacket& recvPacket);
+		void HandleGuildUpdateRanksOpcode(WorldPacket& recvPacket);
+        void HandleGuildSwitchRankOpcode(WorldPacket& recvPacket);
         void HandleGuildChangeInfoTextOpcode(WorldPacket& recvPacket);
         void HandleSaveGuildEmblemOpcode(WorldPacket& recvPacket);
         void HandleGuildRequestPartyState(WorldPacket& recvPacket);
@@ -785,6 +900,13 @@ class WorldSession
         void HandlePetCastSpellOpcode(WorldPacket& recvPacket);
         void HandlePetLearnTalent(WorldPacket& recvPacket);
         void HandleLearnPreviewTalentsPet(WorldPacket& recvPacket);
+        void SendPetNameQuery(ObjectGuid guid, uint64 petNumber);
+        void SendStablePet(uint64 guid);
+        void SendStablePetCallback(PreparedQueryResult result, uint64 guid);
+        void SendStableResult(uint8 guid);
+        bool CheckStableMaster(uint64 guid);
+        void HandleSetPetSlot(WorldPacket& recvData);
+        void HandleStableChangeSlot(WorldPacket& recvData);
 
         void HandleSetActionBarToggles(WorldPacket& recvData);
 
@@ -806,10 +928,10 @@ class WorldSession
         void HandleBattlefieldLeaveOpcode(WorldPacket& recvData);
         void HandleBattlemasterJoinArena(WorldPacket& recvData);
         void HandleReportPvPAFK(WorldPacket& recvData);
-        void HandleRequestRatedBgInfo(WorldPacket& recvData);
+        void HandleRequestRatedInfo(WorldPacket& recvData);
         void HandleRequestPvpOptions(WorldPacket& recvData);
         void HandleRequestPvpReward(WorldPacket& recvData);
-        void HandleRequestRatedBgStats(WorldPacket& recvData);
+        void HandleWargameRequest(WorldPacket& recvData);
 
         void HandleWardenDataOpcode(WorldPacket& recvData);
         void HandleWorldTeleportOpcode(WorldPacket& recvData);
@@ -1012,6 +1134,22 @@ class WorldSession
         void SendTitleEarned(uint32 TitleIndex);
         void SendTitleLost(uint32 TitleIndex);
 
+        // Battle Pay
+        void SendBattlePayDistributionUpdate(uint64 playerGuid, int8 bonusId, int32 bonusFlag, int32 textId, std::string const& bonusText, std::string const& bonusText2);
+        void HandleBattlePayCharBoost(WorldPacket& recvPacket);
+
+        // Item Upgrade 
+        void SendItemUpgradeResult(uint32 result);
+        void HandleUpgradeItem(WorldPacket& recvData);
+
+        // Other
+        void HandlePandarenFactionChoiceOpcode(WorldPacket& recvPacket);
+        void HandleTalentWipeConfirmOpcode(WorldPacket& recvPacket);
+        void HandleSetLootSpecializationOpcode(WorldPacket& recvData);
+        void HandleSetEveryoneIsAssistant(WorldPacket& recvData);
+        void HandleChangeCurrencyFlags(WorldPacket& recvPacket);
+        void HandleRequestResearchHistory(WorldPacket& recvPacket);
+
     private:
         void InitializeQueryCallbackParameters();
         void ProcessQueryCallbacks();
@@ -1087,6 +1225,7 @@ class WorldSession
         AccountTypes _security;
         uint32 _accountId;
         uint8 m_expansion;
+        CharacterBooster* m_charBooster;
 
         typedef std::list<AddonInfo> AddonsList;
 
@@ -1111,6 +1250,7 @@ class WorldSession
         bool _filterAddonMessages;
         uint32 recruiterId;
         bool isRecruiter;
+        bool m_hasBoost;
         ACE_Based::LockedQueue<WorldPacket*, ACE_Thread_Mutex> _recvQueue;
         time_t timeLastWhoCommand;
         z_stream_s* _compressionStream;

@@ -27,7 +27,6 @@ EndScriptData */
 #include "ObjectMgr.h"
 #include "Chat.h"
 #include "Language.h"
-#include "ArenaTeamMgr.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 

@@ -30,6 +30,8 @@
 #include "ObjectAccessor.h"
 #include "Battleground.h"
 #include "BattlegroundMgr.h"
+#include "RatedMgr.h"
+#include "RatedInfo.h"
 #include "MapManager.h"
 #include "InstanceSaveMgr.h"
 #include "MapInstanced.h"
@@ -1528,7 +1530,7 @@ void Group::SetTargetIcon(uint8 id, ObjectGuid whoGuid, ObjectGuid targetGuid, u
 
     m_targetIcons[id] = targetGuid;
 
-    WorldPacket data(SMSG_RAID_TARGET_UPDATE_SINGLE, 8 + 1 + 8 + 1);
+    WorldPacket data(SMSG_RAID_TARGET_UPDATE, 8 + 1 + 8 + 1);
 
     data.WriteBit(whoGuid[6]);
     data.WriteBit(targetGuid[4]);
@@ -2215,7 +2217,7 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
     uint32 arenaTeamId = reference->GetArenaTeamId(arenaSlot);
     uint32 team = reference->GetTeam();
 
-    BattlegroundQueueTypeId bgQueueTypeIdRandom = BattlegroundMgr::BGQueueTypeId(BATTLEGROUND_RB, 0);
+    BattlegroundQueueTypeId bgQueueTypeIdRandom = BattlegroundMgr::BGQueueTypeId(BATTLEGROUND_RB, RATED_TYPE_NOT_RATED);
 
     // check every member of the group to be able to join
     memberscount = 0;
@@ -2256,10 +2258,51 @@ GroupJoinBattlegroundResult Group::CanJoinBattlegroundQueue(Battleground const* 
     }
 
     // only check for MinPlayerCount since MinPlayerCount == MaxPlayerCount for arenas...
-    if (bgOrTemplate->isArena() && memberscount != MinPlayerCount)
+    if (bgOrTemplate->IsArena() && memberscount != MinPlayerCount)
         return ERR_ARENA_TEAM_PARTY_SIZE;
 
     return ERR_BATTLEGROUND_NONE;
+}
+
+GroupRatedStats Group::GetRatedStats(RatedType ratedType)
+{
+    uint32 matchMakerRating = 0;
+    uint32 rating = 0;
+    uint32 playerDivider = 0;
+
+    for (GroupReference* itr = GetFirstMember(); itr != NULL; itr = itr->next())
+    {
+        Player* member = itr->GetSource();
+        if (!member)
+            continue;   // this should never happen
+
+        // Skip if player is not online
+        if (!ObjectAccessor::FindPlayer(member->GetGUID()))
+            continue;
+
+        RatedInfo* rinfo = sRatedMgr->GetRatedInfo(member->GetGUID());
+        ASSERT(rinfo && "RatedInfo must be initialized");
+
+        const StatsBySlot* stats = rinfo->GetStatsBySlot(ratedType);
+        //ASSERT(stats && "Stats must be initialized");
+
+        matchMakerRating += rinfo->GetMatchMakerRating();
+        rating += stats->PersonalRating;
+        ++playerDivider;
+    }
+
+    // x/0 = crash
+    if (playerDivider == 0)
+        playerDivider = 1;
+
+    matchMakerRating /= playerDivider;
+    rating /= playerDivider;
+
+    GroupRatedStats groupStats;
+    groupStats.averageMMR = matchMakerRating;
+    groupStats.averageRating = rating;
+
+    return groupStats;
 }
 
 //===================================================

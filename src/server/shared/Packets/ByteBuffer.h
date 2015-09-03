@@ -1,7 +1,7 @@
 /*
- * Copyright (C) 2011-2015 Project SkyFire <http://www.projectskyfire.org/>
+ * Copyright (C) 2015-Present FeenixCore <http://www.wow-one.com/>
  * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2015 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2014 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -64,6 +64,62 @@ public:
     ~ByteBufferSourceException() throw() { }
 };
 
+//! Structure to ease conversions from single 64 bit integer guid into individual bytes, for packet sending purposes
+//! Nuke this out when porting ObjectGuid from MaNGOS, but preserve the per-byte storage
+struct ObjectGuid
+{
+    public:
+        ObjectGuid() { _data.u64 = UI64LIT(0); }
+        ObjectGuid(uint64 guid) { _data.u64 = guid; }
+        ObjectGuid(ObjectGuid const& other) { _data.u64 = other._data.u64; }
+
+        uint8& operator[](uint32 index)
+        {
+            ASSERT(index < sizeof(uint64));
+
+#if TRINITY_ENDIAN == TRINITY_LITTLEENDIAN
+            return _data.byte[index];
+#else
+            return _data.byte[7 - index];
+#endif
+        }
+
+        uint8 const& operator[](uint32 index) const
+        {
+            ASSERT(index < sizeof(uint64));
+
+#if TRINITY_ENDIAN == TRINITY_LITTLEENDIAN
+            return _data.byte[index];
+#else
+            return _data.byte[7 - index];
+#endif
+        }
+
+        operator uint64()
+        {
+            return _data.u64;
+        }
+
+        ObjectGuid& operator=(uint64 guid)
+        {
+            _data.u64 = guid;
+            return *this;
+        }
+
+        ObjectGuid& operator=(ObjectGuid const& other)
+        {
+            _data.u64 = other._data.u64;
+            return *this;
+        }
+
+    private:
+        union
+        {
+            uint64 u64;
+            uint8 byte[8];
+        } _data;
+
+};
 class ByteBuffer
 {
     public:
@@ -109,6 +165,12 @@ class ByteBuffer
             _bitpos = 8;
         }
 
+        void WriteBitInOrder(ObjectGuid guid, uint8 order[8])
+        {
+            for (uint8 i = 0; i < 8; ++i)
+                WriteBit(guid[order[i]]);
+        }
+
         bool WriteBit(uint32 bit)
         {
             --_bitpos;
@@ -123,6 +185,12 @@ class ByteBuffer
             }
 
             return (bit != 0);
+        }
+
+        void ReadBitInOrder(ObjectGuid& guid, uint8 order[8])
+        {
+            for (uint8 i = 0; i < 8; ++i)
+                guid[order[i]] = ReadBit();
         }
 
         bool ReadBit()
@@ -153,11 +221,23 @@ class ByteBuffer
             return value;
         }
 
+        void ReadBytesSeq(ObjectGuid& guid, uint8 order[8])
+        {
+            for (uint8 i = 0; i < 8; ++i)
+                ReadByteSeq(guid[order[i]]);
+        }
+
         // Reads a byte (if needed) in-place
         void ReadByteSeq(uint8& b)
         {
             if (b != 0)
                 b ^= read<uint8>();
+        }
+
+        void WriteBytesSeq(ObjectGuid guid, uint8 order[8])
+        {
+            for (uint8 i = 0; i < 8; ++i)
+                WriteByteSeq(guid[order[i]]);
         }
 
         void WriteByteSeq(uint8 b)
@@ -171,6 +251,87 @@ class ByteBuffer
             EndianConvert(value);
             put(pos, (uint8 *)&value, sizeof(value));
         }
+
+        void ReadGuidMaskList(ObjectGuid& guid, int count, ...)
+        {
+            va_list ap;
+            va_start(ap, count);
+            for (uint8 i = 0; i<count; ++i)
+            {
+                uint8 offset = va_arg(ap, uint32);
+                guid[offset] = ReadBit();
+            }
+            va_end(ap);
+        }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1)                                                                           { ReadGuidMaskList(guid, 1, v1); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2)                                                                 { ReadGuidMaskList(guid, 2, v1, v2); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3)                                                       { ReadGuidMaskList(guid, 3, v1, v2, v3); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4)                                             { ReadGuidMaskList(guid, 4, v1, v2, v3, v4); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5)                                   { ReadGuidMaskList(guid, 5, v1, v2, v3, v4, v5); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6)                         { ReadGuidMaskList(guid, 6, v1, v2, v3, v4, v5, v6); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7)               { ReadGuidMaskList(guid, 7, v1, v2, v3, v4, v5, v6, v7); }
+        void ReadGuidMask(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7, uint8 v8)     { ReadGuidMaskList(guid, 8, v1, v2, v3, v4, v5, v6, v7, v8); }
+
+        void WriteGuidMaskList(const ObjectGuid& guid, int count, ...)
+        {
+            va_list ap;
+            va_start(ap, count);
+            for (uint8 i = 0; i<count; ++i)
+            {
+                uint8 offset = va_arg(ap, uint32);
+                WriteBit(guid[offset]);
+            }
+            va_end(ap);
+        }
+
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1)                                                                           { WriteGuidMaskList(guid, 1, v1); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2)                                                                 { WriteGuidMaskList(guid, 2, v1, v2); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3)                                                       { WriteGuidMaskList(guid, 3, v1, v2, v3); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4)                                             { WriteGuidMaskList(guid, 4, v1, v2, v3, v4); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5)                                   { WriteGuidMaskList(guid, 5, v1, v2, v3, v4, v5); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6)                         { WriteGuidMaskList(guid, 6, v1, v2, v3, v4, v5, v6); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7)               { WriteGuidMaskList(guid, 7, v1, v2, v3, v4, v5, v6, v7); }
+        void WriteGuidMask(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7, uint8 v8)     { WriteGuidMaskList(guid, 8, v1, v2, v3, v4, v5, v6, v7, v8); }
+
+        void ReadGuidBytesList(ObjectGuid& guid, int count, ...)
+        {
+            va_list ap;
+            va_start(ap, count);
+            for (uint8 i = 0; i<count; ++i)
+            {
+                uint8 offset = va_arg(ap, uint32);
+                ReadByteSeq(guid[offset]);
+            }
+            va_end(ap);
+        }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1)                                                                          { ReadGuidBytesList(guid, 1, v1); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2)                                                                { ReadGuidBytesList(guid, 2, v1, v2); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3)                                                      { ReadGuidBytesList(guid, 3, v1, v2, v3); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4)                                            { ReadGuidBytesList(guid, 4, v1, v2, v3, v4); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5)                                  { ReadGuidBytesList(guid, 5, v1, v2, v3, v4, v5); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6)                        { ReadGuidBytesList(guid, 6, v1, v2, v3, v4, v5, v6); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7)              { ReadGuidBytesList(guid, 7, v1, v2, v3, v4, v5, v6, v7); }
+        void ReadGuidBytes(ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7, uint8 v8)    { ReadGuidBytesList(guid, 8, v1, v2, v3, v4, v5, v6, v7, v8); }
+
+        void WriteGuidBytesList(const ObjectGuid& guid, int count, ...)
+        {
+            va_list ap;
+            va_start(ap, count);
+            for (uint8 i = 0; i<count; ++i)
+            {
+                uint8 offset = va_arg(ap, uint32);
+                WriteByteSeq(guid[offset]);
+            }
+            va_end(ap);
+        }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1)                                                                           { WriteGuidBytesList(guid, 1, v1); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2)                                                                 { WriteGuidBytesList(guid, 2, v1, v2); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3)                                                       { WriteGuidBytesList(guid, 3, v1, v2, v3); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4)                                             { WriteGuidBytesList(guid, 4, v1, v2, v3, v4); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5)                                   { WriteGuidBytesList(guid, 5, v1, v2, v3, v4, v5); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6)                         { WriteGuidBytesList(guid, 6, v1, v2, v3, v4, v5, v6); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7)               { WriteGuidBytesList(guid, 7, v1, v2, v3, v4, v5, v6, v7); }
+        void WriteGuidBytes(const ObjectGuid& guid, uint8 v1, uint8 v2, uint8 v3, uint8 v4, uint8 v5, uint8 v6, uint8 v7, uint8 v8)     { WriteGuidBytesList(guid, 8, v1, v2, v3, v4, v5, v6, v7, v8); }
 
         /**
           * @name   PutBits
@@ -554,6 +715,14 @@ class ByteBuffer
         {
             if (buffer.wpos())
                 append(buffer.contents(), buffer.wpos());
+        }
+
+        void AppendBits(const ByteBuffer& buffer)
+        {
+            for (uint32 i = 0; i < buffer.wpos(); ++i)
+                WriteBits(*(buffer.contents() + i), 8);
+
+            WriteBits(buffer._curbitval >> buffer._bitpos, 8 - buffer._bitpos);
         }
 
         // can be used in SMSG_MONSTER_MOVE opcode

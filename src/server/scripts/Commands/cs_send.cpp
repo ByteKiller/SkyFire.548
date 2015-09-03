@@ -187,7 +187,7 @@ public:
 
         for (ItemPairs::const_iterator itr = items.begin(); itr != items.end(); ++itr)
         {
-            if (Item* item = Item::CreateItem(itr->first, itr->second, handler->GetSession() ? handler->GetSession()->GetPlayer() : 0))
+            if (Item* item = Item::CreateItem(itr->first, itr->second, handler->GetSession() ? handler->GetSession()->GetPlayer()->GetGUID() : 0))
             {
                 item->SaveToDB(trans);                               // save for prevent lost at next mail load, if send fail then item will deleted
                 draft.AddItem(item);

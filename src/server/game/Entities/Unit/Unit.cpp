@@ -1384,7 +1384,7 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
             victim->DealDamageMods(this, damage, NULL);
 
             /// @todo Move this to a packet handler
-            WorldPacket data(SMSG_SPELLDAMAGESHIELD, 8 + 8 + 4 + 4 + 4 + 4 + 4);
+            WorldPacket data(SMSG_SPELL_DAMAGE_SHIELD, 8 + 8 + 4 + 4 + 4 + 4 + 4);
             data << uint64(victim->GetGUID());
             data << uint64(GetGUID());
             data << uint32(i_spellProto->Id);
@@ -4771,7 +4771,7 @@ void Unit::SendSpellNonMeleeDamageLog(SpellNonMeleeDamage* log)
     ObjectGuid targetGuid = log->target->GetGUID();
     int32 overkill = log->damage - log->target->GetHealth();
 
-    WorldPacket data(SMSG_SPELLNONMELEEDAMAGELOG, (16+4+4+4+1+4+4+1+1+4+4+1)); // we guess size
+    WorldPacket data(SMSG_SPELL_NON_MELEE_DAMAGE_LOG, (16+4+4+4+1+4+4+1+1+4+4+1)); // we guess size
     data.WriteBit(targetGuid[2]);
     data.WriteBit(attackerGuid[7]);
     data.WriteBit(attackerGuid[6]);
@@ -4854,7 +4854,7 @@ void Unit::SendPeriodicAuraLog(SpellPeriodicAuraLogInfo* pInfo)
     ObjectGuid casterGuid = aura->GetCasterGUID();
     ObjectGuid targetGuid = GetGUID();
 
-    WorldPacket data(SMSG_SPELL_PERIODIC_AURA_LOG, 30);
+    WorldPacket data(SMSG_PERIODIC_AURA_LOG, 30);
 
     data.WriteBit(targetGuid[7]);
     data.WriteBit(casterGuid[0]);
@@ -4979,7 +4979,7 @@ void Unit::SendPeriodicAuraLog(SpellPeriodicAuraLogInfo* pInfo)
 
 void Unit::SendSpellMiss(Unit* target, uint32 spellID, SpellMissInfo missInfo)
 {
-    WorldPacket data(SMSG_SPELLLOGMISS, (4+8+1+4+8+1));
+    WorldPacket data(SMSG_SPELL_LOG_MISS, (4+8+1+4+8+1));
     data << uint32(spellID);
     data << uint64(GetGUID());
     data << uint8(0);                                       // can be 0 or 1
@@ -5003,7 +5003,7 @@ void Unit::SendSpellDamageResist(Unit* target, uint32 spellId)
 
 void Unit::SendSpellDamageImmune(Unit* target, uint32 spellId)
 {
-    WorldPacket data(SMSG_SPELLORDAMAGE_IMMUNE, 8+8+4+1);
+    WorldPacket data(SMSG_SPELL_OR_DAMAGE_IMMUNE, 8+8+4+1);
     data << uint64(GetGUID());
     data << uint64(target->GetGUID());
     data << uint32(spellId);
@@ -8591,7 +8591,7 @@ void Unit::SendHealSpellLog(Unit* victim, uint32 SpellID, uint32 Damage, uint32 
     ObjectGuid casterGuid = GetGUID();
 
     // we guess size
-    WorldPacket data(SMSG_SPELLHEALLOG, 8 + 8 + 4 + 4 + 4 + 4 + 1 + 1);
+    WorldPacket data(SMSG_SPELL_HEAL_LOG, 8 + 8 + 4 + 4 + 4 + 4 + 1 + 1);
 
     data << uint32(SpellID);
     data << uint32(Absorb);
@@ -8656,7 +8656,7 @@ void Unit::SendEnergizeSpellLog(Unit* victim, uint32 spellId, int32 damage, Powe
     ObjectGuid victimGuid = victim->GetGUID();
     ObjectGuid casterGuid = GetGUID();
 
-    WorldPacket data(SMSG_SPELLENERGIZELOG, (8+8+4+4+4+1));
+    WorldPacket data(SMSG_SPELL_ENERGIZE_LOG, (8+8+4+4+4+1));
 
     data.WriteBit(victimGuid[7]);
     data.WriteBit(victimGuid[3]);
@@ -10168,7 +10168,7 @@ void Unit::Mount(uint32 mount, uint32 VehicleId, uint32 creatureEntry)
         {
             Battleground* bg = ToPlayer()->GetBattleground();
             // don't unsummon pet in arena but SetFlag UNIT_FLAG_STUNNED to disable pet's interface
-            if (bg && bg->isArena())
+            if (bg && bg->IsArena())
                 pet->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_STUNNED);
             else
                 player->UnsummonPetTemporaryIfAny();
@@ -10982,15 +10982,15 @@ void Unit::SetSpeed(UnitMoveType mtype, float rate, bool forced)
 
     static Opcodes const moveTypeToOpcode[MAX_MOVE_TYPE][3] =
     {
-        {SMSG_SPLINE_MOVE_SET_WALK_SPEED,        SMSG_MOVE_SET_WALK_SPEED,        SMSG_MOVE_UPDATE_WALK_SPEED       },
-        {SMSG_SPLINE_MOVE_SET_RUN_SPEED,         SMSG_MOVE_SET_RUN_SPEED,         SMSG_MOVE_UPDATE_RUN_SPEED        },
-        {SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED,    SMSG_MOVE_SET_RUN_BACK_SPEED,    SMSG_MOVE_UPDATE_RUN_BACK_SPEED   },
-        {SMSG_SPLINE_MOVE_SET_SWIM_SPEED,        SMSG_MOVE_SET_SWIM_SPEED,        SMSG_MOVE_UPDATE_SWIM_SPEED       },
-        {SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED,   SMSG_MOVE_SET_SWIM_BACK_SPEED,   SMSG_MOVE_UPDATE_SWIM_BACK_SPEED  },
-        {SMSG_SPLINE_MOVE_SET_TURN_RATE,         SMSG_MOVE_SET_TURN_RATE,         SMSG_MOVE_UPDATE_TURN_RATE        },
-        {SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED,      SMSG_MOVE_SET_FLIGHT_SPEED,      SMSG_MOVE_UPDATE_FLIGHT_SPEED     },
-        {SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, SMSG_MOVE_SET_FLIGHT_BACK_SPEED, SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED},
-        {SMSG_SPLINE_MOVE_SET_PITCH_RATE,        SMSG_MOVE_SET_PITCH_RATE,        SMSG_MOVE_UPDATE_PITCH_RATE       },
+        {SMSG_MOVE_SPLINE_SET_WALK_SPEED,        SMSG_MOVE_SET_WALK_SPEED,        SMSG_MOVE_UPDATE_WALK_SPEED       },
+        {SMSG_MOVE_SPLINE_SET_RUN_SPEED,         SMSG_MOVE_SET_RUN_SPEED,         SMSG_MOVE_UPDATE_RUN_SPEED        },
+        {SMSG_MOVE_SPLINE_SET_RUN_BACK_SPEED,    SMSG_MOVE_SET_RUN_BACK_SPEED,    SMSG_MOVE_UPDATE_RUN_BACK_SPEED   },
+        {SMSG_MOVE_SPLINE_SET_SWIM_SPEED,        SMSG_MOVE_SET_SWIM_SPEED,        SMSG_MOVE_UPDATE_SWIM_SPEED       },
+        {SMSG_MOVE_SPLINE_SET_SWIM_BACK_SPEED,   SMSG_MOVE_SET_SWIM_BACK_SPEED,   SMSG_MOVE_UPDATE_SWIM_BACK_SPEED  },
+        {SMSG_MOVE_SPLINE_SET_TURN_RATE,         SMSG_MOVE_SET_TURN_RATE,         SMSG_MOVE_UPDATE_TURN_RATE        },
+        {SMSG_MOVE_SPLINE_SET_FLIGHT_SPEED,      SMSG_MOVE_SET_FLIGHT_SPEED,      SMSG_MOVE_UPDATE_FLIGHT_SPEED     },
+        {SMSG_MOVE_SPLINE_SET_FLIGHT_BACK_SPEED, SMSG_MOVE_SET_FLIGHT_BACK_SPEED, SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED},
+        {SMSG_MOVE_SPLINE_SET_PITCH_RATE,        SMSG_MOVE_SET_PITCH_RATE,        SMSG_MOVE_UPDATE_PITCH_RATE       },
     };
 
     if (GetTypeId() == TYPEID_PLAYER)
@@ -13884,7 +13884,7 @@ void Unit::Kill(Unit* victim, bool durabilityLoss)
     {
         ObjectGuid playerGuid = player->GetGUID();
         ObjectGuid victimGuid = victim->GetGUID();
-        WorldPacket data(SMSG_PARTYKILLLOG); // send event PARTY_KILL
+        WorldPacket data(SMSG_PARTY_KILL_LOG); // send event PARTY_KILL
 
         data.WriteBit(victimGuid[7]);
         data.WriteBit(victimGuid[2]);
@@ -14337,9 +14337,9 @@ void Unit::SetRooted(bool apply, bool packetOnly /*= false*/)
     }
 
     if (apply)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_ROOT, SMSG_MOVE_ROOT, SMSG_MOVE_ROOT).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_ROOT, SMSG_MOVE_ROOT, SMSG_MOVE_ROOT).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_UNROOT, SMSG_MOVE_UNROOT, SMSG_MOVE_UNROOT).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_UNROOT, SMSG_MOVE_UNROOT, SMSG_MOVE_UNROOT).Send();
 }
 
 void Unit::SetFeared(bool apply)
@@ -16775,9 +16775,9 @@ bool Unit::SetWalk(bool enable)
 
     ///@ TODO: Find proper opcode for walk mode setting in player mind controlling a player case
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_WALK_MODE, SMSG_SPLINE_MOVE_SET_WALK_MODE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_WALK_MODE, SMSG_MOVE_SPLINE_SET_WALK_MODE).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_RUN_MODE, SMSG_SPLINE_MOVE_SET_RUN_MODE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_RUN_MODE, SMSG_MOVE_SPLINE_SET_RUN_MODE).Send();
 
     return true;
 }
@@ -16804,9 +16804,9 @@ bool Unit::SetDisableGravity(bool disable, bool packetOnly /*= false*/)
     }
 
     if (disable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_GRAVITY_DISABLE, SMSG_MOVE_GRAVITY_DISABLE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_GRAVITY_DISABLE, SMSG_MOVE_GRAVITY_DISABLE).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_GRAVITY_ENABLE, SMSG_MOVE_GRAVITY_ENABLE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_GRAVITY_ENABLE, SMSG_MOVE_GRAVITY_ENABLE).Send();
 
     return true;
 }
@@ -16838,9 +16838,9 @@ bool Unit::SetSwim(bool enable)
         RemoveUnitMovementFlag(MOVEMENTFLAG_SWIMMING);
 
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_START_SWIM, NULL_OPCODE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_START_SWIM, NULL_OPCODE).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_STOP_SWIM, NULL_OPCODE).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_STOP_SWIM, NULL_OPCODE).Send();
 
     return true;
 }
@@ -16864,9 +16864,9 @@ bool Unit::SetCanFly(bool enable)
     }
 
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_FLYING, SMSG_MOVE_SET_CAN_FLY).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_FLYING, SMSG_MOVE_SET_CAN_FLY).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_UNSET_FLYING, SMSG_MOVE_UNSET_CAN_FLY).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_UNSET_FLYING, SMSG_MOVE_UNSET_CAN_FLY).Send();
 
     return true;
 }
@@ -16885,9 +16885,9 @@ bool Unit::SetWaterWalking(bool enable, bool packetOnly /*= false */)
     }
 
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_WATER_WALK, SMSG_MOVE_WATER_WALK).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_WATER_WALK, SMSG_MOVE_WATER_WALK).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_LAND_WALK, SMSG_MOVE_LAND_WALK).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_LAND_WALK, SMSG_MOVE_LAND_WALK).Send();
 
     return true;
 }
@@ -16906,9 +16906,9 @@ bool Unit::SetFeatherFall(bool enable, bool packetOnly /*= false */)
     }
 
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_FEATHER_FALL, SMSG_MOVE_FEATHER_FALL).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_FEATHER_FALL, SMSG_MOVE_FEATHER_FALL).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_NORMAL_FALL, SMSG_MOVE_NORMAL_FALL).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_NORMAL_FALL, SMSG_MOVE_NORMAL_FALL).Send();
 
     return true;
 }
@@ -16940,9 +16940,9 @@ bool Unit::SetHover(bool enable, bool packetOnly /*= false*/)
     }
 
     if (enable)
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_SET_HOVER, SMSG_MOVE_SET_HOVER).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_SET_HOVER, SMSG_MOVE_SET_HOVER).Send();
     else
-        Movement::PacketSender(this, SMSG_SPLINE_MOVE_UNSET_HOVER, SMSG_MOVE_UNSET_HOVER).Send();
+        Movement::PacketSender(this, SMSG_MOVE_SPLINE_UNSET_HOVER, SMSG_MOVE_UNSET_HOVER).Send();
 
     return true;
 }
@@ -16975,7 +16975,7 @@ void Unit::SendSetPlayHoverAnim(bool PlayHoverAnim)
 
 void Unit::SendMovementSetSplineAnim(Movement::AnimType anim)
 {
-    WorldPacket data(SMSG_SPLINE_MOVE_SET_ANIM, 8 + 4);
+    WorldPacket data(SMSG_MOVE_SPLINE_SET_ANIM, 8 + 4);
     data.append(GetPackGUID());
     data << uint32(anim);
     SendMessageToSet(&data, false);
@@ -17197,7 +17197,7 @@ void Unit::SendSetVehicleRecId(uint32 vehicleId)
     }
 
     ObjectGuid vehicleGuid = GetGUID();
-    WorldPacket data(SMSG_SET_VEHICLE_REC_ID, 8 + 4);
+    WorldPacket data(SMSG_MOVE_SET_VEHICLE_REC_ID, 8 + 4);
     data.WriteBit(vehicleGuid[5]);
     data.WriteBit(vehicleGuid[7]);
     data.WriteBit(vehicleGuid[2]);

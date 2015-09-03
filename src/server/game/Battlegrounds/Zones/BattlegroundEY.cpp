@@ -1,7 +1,6 @@
 /*
- * Copyright (C) 2011-2015 Project SkyFire <http://www.projectskyfire.org/>
  * Copyright (C) 2008-2015 TrinityCore <http://www.trinitycore.org/>
- * Copyright (C) 2005-2015 MaNGOS <http://getmangos.com/>
+ * Copyright (C) 2005-2014 MaNGOS <http://getmangos.com/>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -426,8 +425,8 @@ void BattlegroundEY::HandleAreaTrigger(Player* player, uint32 trigger)
 bool BattlegroundEY::SetupBattleground()
 {
         // doors
-    if (!AddObject(BG_EY_OBJECT_DOOR_A, BG_OBJECT_A_DOOR_EY_ENTRY, 2527.6f, 1596.91f, 1262.13f, -3.12414f, -0.173642f, -0.001515f, 0.98477f, -0.008594f, RESPAWN_IMMEDIATELY)
-        || !AddObject(BG_EY_OBJECT_DOOR_H, BG_OBJECT_H_DOOR_EY_ENTRY, 1803.21f, 1539.49f, 1261.09f, 3.14159f, 0.173648f, 0, 0.984808f, 0, RESPAWN_IMMEDIATELY)
+    if (!AddObject(BG_EY_OBJECT_DOOR_A, BG_OBJECT_A_DOOR_EY_ENTRY, 2527.6f, 1596.91f, 1245.12f, 3.031230f, -0.173642f, -0.001515f, 0.98477f, -0.008594f, RESPAWN_IMMEDIATELY)
+        || !AddObject(BG_EY_OBJECT_DOOR_H, BG_OBJECT_H_DOOR_EY_ENTRY, 1803.21f, 1539.49f, 1245.12f, 3.14159f, 0.173648f, 0, 0.984808f, 0, RESPAWN_IMMEDIATELY)
         // banners (alliance)
         || !AddObject(BG_EY_OBJECT_A_BANNER_FEL_REAVER_CENTER, BG_OBJECT_A_BANNER_EY_ENTRY, 2057.46f, 1735.07f, 1187.91f, -0.925024f, 0, 0, 0.446198f, -0.894934f, RESPAWN_ONE_DAY)
         || !AddObject(BG_EY_OBJECT_A_BANNER_FEL_REAVER_LEFT, BG_OBJECT_A_BANNER_EY_ENTRY, 2032.25f, 1729.53f, 1190.33f, 1.8675f, 0, 0, 0.803857f, 0.594823f, RESPAWN_ONE_DAY)
@@ -468,7 +467,7 @@ bool BattlegroundEY::SetupBattleground()
         || !AddObject(BG_EY_OBJECT_N_BANNER_MAGE_TOWER_LEFT, BG_OBJECT_N_BANNER_EY_ENTRY, 2269.13f, 1737.7f, 1186.66f, 0.994838f, 0, 0, 0.477159f, 0.878817f, RESPAWN_ONE_DAY)
         || !AddObject(BG_EY_OBJECT_N_BANNER_MAGE_TOWER_RIGHT, BG_OBJECT_N_BANNER_EY_ENTRY, 2300.86f, 1741.25f, 1187.7f, -0.785398f, 0, 0, 0.382683f, -0.92388f, RESPAWN_ONE_DAY)
         // flags
-        || !AddObject(BG_EY_OBJECT_FLAG_NETHERSTORM, BG_OBJECT_FLAG2_EY_ENTRY, 2174.782227f, 1569.054688f, 1160.361938f, -1.448624f, 0, 0, 0.662620f, -0.748956f, RESPAWN_ONE_DAY)
+        || !AddObject(BG_EY_OBJECT_FLAG_NETHERSTORM, BG_OBJECT_FLAG2_EY_ENTRY, 2174.867676f, 1569.774536f, 1159.935547f, -1.448624f, 0, 0, 0.662620f, -0.748956f, RESPAWN_ONE_DAY)
         || !AddObject(BG_EY_OBJECT_FLAG_FEL_REAVER, BG_OBJECT_FLAG1_EY_ENTRY, 2044.28f, 1729.68f, 1189.96f, -0.017453f, 0, 0, 0.008727f, -0.999962f, RESPAWN_ONE_DAY)
         || !AddObject(BG_EY_OBJECT_FLAG_BLOOD_ELF, BG_OBJECT_FLAG1_EY_ENTRY, 2048.83f, 1393.65f, 1194.49f, 0.20944f, 0, 0, 0.104528f, 0.994522f, RESPAWN_ONE_DAY)
         || !AddObject(BG_EY_OBJECT_FLAG_DRAENEI_RUINS, BG_OBJECT_FLAG1_EY_ENTRY, 2286.56f, 1402.36f, 1197.11f, 3.72381f, 0, 0, 0.957926f, -0.287016f, RESPAWN_ONE_DAY)
@@ -843,31 +842,31 @@ void BattlegroundEY::FillInitialWorldStates(WorldStateBuilder& builder)
     builder.AppendState(0xab0, 0x0);
     builder.AppendState(0xaaf, 0x0);
 
-    builder.AppendState(DRAENEI_RUINS_HORDE_CONTROL,      m_PointOwnedByTeam[DRAENEI_RUINS] == HORDE && m_PointState[DRAENEI_RUINS] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(DRAENEI_RUINS_HORDE_CONTROL     , m_PointOwnedByTeam[DRAENEI_RUINS] == HORDE && m_PointState[DRAENEI_RUINS] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(DRAENEI_RUINS_ALLIANCE_CONTROL,   m_PointOwnedByTeam[DRAENEI_RUINS] == ALLIANCE && m_PointState[DRAENEI_RUINS] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(DRAENEI_RUINS_ALLIANCE_CONTROL  , m_PointOwnedByTeam[DRAENEI_RUINS] == ALLIANCE && m_PointState[DRAENEI_RUINS] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(DRAENEI_RUINS_UNCONTROL,          m_PointState[DRAENEI_RUINS] != EY_POINT_UNDER_CONTROL);
+    builder.AppendState(DRAENEI_RUINS_UNCONTROL         , m_PointState[DRAENEI_RUINS] != EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(MAGE_TOWER_ALLIANCE_CONTROL,      m_PointOwnedByTeam[MAGE_TOWER] == ALLIANCE && m_PointState[MAGE_TOWER] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(MAGE_TOWER_ALLIANCE_CONTROL     , m_PointOwnedByTeam[MAGE_TOWER] == ALLIANCE && m_PointState[MAGE_TOWER] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(MAGE_TOWER_HORDE_CONTROL,         m_PointOwnedByTeam[MAGE_TOWER] == HORDE && m_PointState[MAGE_TOWER] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(MAGE_TOWER_HORDE_CONTROL        , m_PointOwnedByTeam[MAGE_TOWER] == HORDE && m_PointState[MAGE_TOWER] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(MAGE_TOWER_UNCONTROL,             m_PointState[MAGE_TOWER] != EY_POINT_UNDER_CONTROL);
+    builder.AppendState(MAGE_TOWER_UNCONTROL            , m_PointState[MAGE_TOWER] != EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(FEL_REAVER_HORDE_CONTROL,         m_PointOwnedByTeam[FEL_REAVER] == HORDE && m_PointState[FEL_REAVER] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(FEL_REAVER_HORDE_CONTROL        , m_PointOwnedByTeam[FEL_REAVER] == HORDE && m_PointState[FEL_REAVER] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(FEL_REAVER_ALLIANCE_CONTROL,      m_PointOwnedByTeam[FEL_REAVER] == ALLIANCE && m_PointState[FEL_REAVER] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(FEL_REAVER_ALLIANCE_CONTROL     , m_PointOwnedByTeam[FEL_REAVER] == ALLIANCE && m_PointState[FEL_REAVER] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(FEL_REAVER_UNCONTROL,             m_PointState[FEL_REAVER] != EY_POINT_UNDER_CONTROL);
+    builder.AppendState(FEL_REAVER_UNCONTROL            , m_PointState[FEL_REAVER] != EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(BLOOD_ELF_HORDE_CONTROL,          m_PointOwnedByTeam[BLOOD_ELF] == HORDE && m_PointState[BLOOD_ELF] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(BLOOD_ELF_HORDE_CONTROL         , m_PointOwnedByTeam[BLOOD_ELF] == HORDE && m_PointState[BLOOD_ELF] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(BLOOD_ELF_ALLIANCE_CONTROL,       m_PointOwnedByTeam[BLOOD_ELF] == ALLIANCE && m_PointState[BLOOD_ELF] == EY_POINT_UNDER_CONTROL);
+    builder.AppendState(BLOOD_ELF_ALLIANCE_CONTROL      , m_PointOwnedByTeam[BLOOD_ELF] == ALLIANCE && m_PointState[BLOOD_ELF] == EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(BLOOD_ELF_UNCONTROL,              m_PointState[BLOOD_ELF] != EY_POINT_UNDER_CONTROL);
+    builder.AppendState(BLOOD_ELF_UNCONTROL             , m_PointState[BLOOD_ELF] != EY_POINT_UNDER_CONTROL);
 
-    builder.AppendState(NETHERSTORM_FLAG,                 m_FlagState == BG_EY_FLAG_STATE_ON_BASE);
+    builder.AppendState(NETHERSTORM_FLAG                , m_FlagState == BG_EY_FLAG_STATE_ON_BASE);
 
     builder.AppendState(0xad2, 0x1);
     builder.AppendState(0xad1, 0x1);

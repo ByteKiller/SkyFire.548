@@ -341,7 +341,7 @@ void Spell::EffectInstaKill(SpellEffIndex /*effIndex*/)
     ObjectGuid targetguid = unitTarget->GetGUID();
     ObjectGuid casterguid = m_caster->GetGUID();
 
-    WorldPacket data(SMSG_SPELLINSTAKILLLOG, 8 + 8 + 4);
+    WorldPacket data(SMSG_SPELL_INSTAKILL_LOG, 8 + 8 + 4);
 
     data.WriteBit(casterguid[6]);
     data.WriteBit(targetguid[0]);
@@ -2015,7 +2015,7 @@ void Spell::EffectSummonChangeItem(SpellEffIndex effIndex)
         return;
 
     Player* player = m_caster->ToPlayer();
-
+    uint64 guid = player->GetGUID();
     // applied only to using item
     if (!m_CastItem)
         return;
@@ -2030,7 +2030,7 @@ void Spell::EffectSummonChangeItem(SpellEffIndex effIndex)
 
     uint16 pos = m_CastItem->GetPos();
 
-    Item* pNewItem = Item::CreateItem(newitemid, 1, player);
+    Item* pNewItem = Item::CreateItem(newitemid, 1, guid);
     if (!pNewItem)
         return;
 
@@ -2364,6 +2364,32 @@ void Spell::EffectDispel(SpellEffIndex effIndex)
     uint32 dispel_type = m_spellInfo->Effects[effIndex].MiscValue;
     uint32 dispelMask  = SpellInfo::GetDispelMask(DispelType(dispel_type));
 
+    // Before dispel
+    switch (m_spellInfo->Id)
+    {
+        case 4987:  // Epuration
+            if (m_caster->HasAura(53551))
+                dispelMask = DISPEL_ALL_MASK;
+            break;
+        case 88423: // Nature's Cure
+            dispelMask = ((1<<DISPEL_MAGIC) | (1<<DISPEL_CURSE) | (1<<DISPEL_POISON));
+            break;
+        case 115450:// Detox
+        {
+            if (effIndex > 1)
+                if (Player* plr = m_caster->ToPlayer())
+                    if (plr->GetSpecializationId(plr->GetActiveSpec()) != SPEC_MONK_MISTWEAVER)
+                        return;
+
+            break;
+        }
+        case 475: // Remove Curse
+            if (m_caster->HasAura(115700))
+                m_caster->AddAura(115701, m_caster);
+        default:
+            break;
+    }
+
     DispelChargesList dispel_list;
     unitTarget->GetDispellableAuraList(m_caster, dispelMask, dispel_list);
     if (dispel_list.empty())
@@ -2428,33 +2454,98 @@ void Spell::EffectDispel(SpellEffIndex effIndex)
     if (success_list.empty())
         return;
 
-    WorldPacket dataSuccess(SMSG_SPELLDISPELLOG, 8+8+4+1+4+success_list.size()*5);
-    // Send packet header
-    dataSuccess.append(unitTarget->GetPackGUID());         // Victim GUID
-    dataSuccess.append(m_caster->GetPackGUID());           // Caster GUID
-    dataSuccess << uint32(m_spellInfo->Id);                // dispel spell id
-    dataSuccess << uint8(0);                               // not used
-    dataSuccess << uint32(success_list.size());            // count
+    // Custom effects
+    if (m_caster->GetTypeId() == TYPEID_PLAYER)
+    {
+        // Glyph of Dispel Magic
+        if (m_spellInfo->Id == 97690)
+        {
+            if (AuraEffect* aurEff = m_caster->GetAuraEffect(55677, 0))
+            {
+                if (m_caster->IsFriendlyTo(unitTarget))
+                {
+                    int32 bp = int32(unitTarget->CountPctFromMaxHealth(aurEff->GetAmount()));
+                    m_caster->CastCustomSpell(unitTarget, 56131, &bp, 0, 0, true); 
+                }
+            }
+        }
+    }
+
+    ObjectGuid targetGuid = unitTarget->GetGUID();
+    ObjectGuid casterGuid = m_caster->GetGUID();
+    WorldPacket dataSuccess(SMSG_SPELL_DISPEL_LOG, 8+8+4+1+4+success_list.size()*8);
+    dataSuccess.WriteBit(targetGuid[2]);
+    dataSuccess.WriteBit(casterGuid[4]);
+    dataSuccess.WriteBit(targetGuid[6]);
+    dataSuccess.WriteBit(casterGuid[5]);
+    dataSuccess.WriteBit(0); // Fake bit
+    dataSuccess.WriteBit(0); // Fake bit
+    dataSuccess.WriteGuidMask(targetGuid, 5, 7, 4, 0, 1);
+    dataSuccess.WriteBits(success_list.size(), 22);
+    dataSuccess.WriteBit(casterGuid[0]);
+
+    // No Idea what this is
+    for (uint32 i = 0; i < success_list.size(); ++i)
+    {
+        dataSuccess.WriteBit(0);
+        dataSuccess.WriteBit(0);
+        dataSuccess.WriteBit(0);
+    }
+
+    dataSuccess.WriteGuidMask(casterGuid, 3, 2);
+    dataSuccess.WriteBit(targetGuid[3]);
+    dataSuccess.WriteGuidMask(casterGuid, 1, 7, 6);
+
     for (DispelChargesList::iterator itr = success_list.begin(); itr != success_list.end(); ++itr)
     {
         // Send dispelled spell info
         dataSuccess << uint32(itr->first->GetId());              // Spell Id
-        dataSuccess << uint8(0);                        // 0 - dispelled !=0 cleansed
+        dataSuccess << uint32(0);                        // 0 - dispelled !=0 cleansed
         unitTarget->RemoveAurasDueToSpellByDispel(itr->first->GetId(), m_spellInfo->Id, itr->first->GetCasterGUID(), m_caster, itr->second);
     }
+
+    dataSuccess.WriteByteSeq(casterGuid[4]);
+    dataSuccess.WriteByteSeq(targetGuid[3]);
+    dataSuccess.WriteGuidBytes(casterGuid, 6, 0);
+    dataSuccess.WriteGuidBytes(targetGuid, 5, 1);
+    dataSuccess.WriteGuidBytes(casterGuid, 3, 2, 1, 5);
+    dataSuccess.WriteByteSeq(targetGuid[0]);
+    dataSuccess << uint32(m_spellInfo->Id); // dispel spell id
+    dataSuccess.WriteGuidBytes(targetGuid, 7, 6, 2);
+    dataSuccess.WriteByteSeq(casterGuid[7]);
+    dataSuccess.WriteByteSeq(targetGuid[4]);
+
     m_caster->SendMessageToSet(&dataSuccess, true);
 
     // On success dispel
-    // Devour Magic
-    if (m_spellInfo->SpellFamilyName == SPELLFAMILY_WARLOCK && m_spellInfo->GetCategory() == SPELLCATEGORY_DEVOUR_MAGIC)
+    switch (m_spellInfo->Id)
     {
-        int32 heal_amount = m_spellInfo->Effects[EFFECT_1].CalcValue(m_caster);
-        m_caster->CastCustomSpell(m_caster, 19658, &heal_amount, NULL, NULL, true);
-        // Glyph of Felhunter
-        if (Unit* owner = m_caster->GetOwner())
-            if (owner->GetAura(56249))
-                owner->CastCustomSpell(owner, 19658, &heal_amount, NULL, NULL, true);
+        case 527:   // Purify
+            // Glyph of Purify
+            if (m_caster->HasAura(55677))
+                m_caster->CastSpell(unitTarget, 56131, true);
+            break;
+        case 19505: // Devour Magic
+        {
+            int32 heal_amount = m_spellInfo->Effects[EFFECT_1].CalcValue(m_caster);
+            m_caster->CastCustomSpell(m_caster, 19658, &heal_amount, NULL, NULL, true);
+            // Glyph of Felhunter
+            if (Unit* owner = m_caster->GetOwner())
+                if (owner->GetAura(56249))
+                    owner->CastCustomSpell(owner, 19658, &heal_amount, NULL, NULL, true);
+
+            break;
+        }
+        case 51886: // Cleanse Spirit
+        case 77130: // Purify Spirit
+            if (m_caster->HasAura(86959)) // Glyph of Cleansing Waters
+                m_caster->CastSpell(unitTarget, 86961, true);
+            break;
+        default:
+            break;
     }
+
+    CallScriptSuccessfulDispel(effIndex);
 }
 
 void Spell::EffectDualWield(SpellEffIndex /*effIndex*/)
@@ -5378,7 +5469,7 @@ void Spell::EffectStealBeneficialBuff(SpellEffIndex effIndex)
     if (success_list.empty())
         return;
 
-    WorldPacket dataSuccess(SMSG_SPELLSTEALLOG, 8+8+4+1+4+damage*5);
+    WorldPacket dataSuccess(SMSG_SPELL_STEAL_LOG, 8+8+4+1+4+damage*5);
     dataSuccess.append(unitTarget->GetPackGUID());  // Victim GUID
     dataSuccess.append(m_caster->GetPackGUID());    // Caster GUID
     dataSuccess << uint32(m_spellInfo->Id);         // dispel spell id
@@ -5392,7 +5483,6 @@ void Spell::EffectStealBeneficialBuff(SpellEffIndex effIndex)
     }
     m_caster->SendMessageToSet(&dataSuccess, true);
 }
-
 void Spell::EffectKillCreditPersonal(SpellEffIndex effIndex)
 {
     if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)
@@ -5946,7 +6036,7 @@ void Spell::EffectBind(SpellEffIndex effIndex)
     player->SetHomebind(homeLoc, areaId);
 
     // binding
-    WorldPacket data(SMSG_BINDPOINTUPDATE, 4 + 4 + 4 + 4 + 4);
+    WorldPacket data(SMSG_BIND_POINT_UPDATE, 4 + 4 + 4 + 4 + 4);
     data << float(homeLoc.GetPositionX());
     data << float(homeLoc.GetPositionY());
     data << float(homeLoc.GetPositionZ());
@@ -5961,30 +6051,15 @@ void Spell::EffectBind(SpellEffIndex effIndex)
     ObjectGuid guid = m_caster->GetGUID();
 
     // zone update
-    data.Initialize(SMSG_PLAYERBOUND, 1 + 8 + 4);
-    data.WriteBit(guid[2]);
-    data.WriteBit(guid[4]);
-    data.WriteBit(guid[0]);
-    data.WriteBit(guid[3]);
-    data.WriteBit(guid[6]);
-    data.WriteBit(guid[7]);
-    data.WriteBit(guid[5]);
-    data.WriteBit(guid[1]);
+    data.Initialize(SMSG_PLAYER_BOUND, 1 + 8 + 4);
+    data.WriteGuidMask(guid, 2, 4, 0, 3, 6, 7, 5, 1);
 
-    data.WriteByteSeq(guid[6]);
-    data.WriteByteSeq(guid[1]);
-    data.WriteByteSeq(guid[2]);
-    data.WriteByteSeq(guid[3]);
-    data.WriteByteSeq(guid[4]);
-    data.WriteByteSeq(guid[5]);
-    data.WriteByteSeq(guid[7]);
-    data.WriteByteSeq(guid[0]);
+    data.WriteGuidBytes(guid, 6, 1, 2, 3, 4, 5, 7, 0);
 
     data << uint32(areaId);
 
     player->SendDirectMessage(&data);
 }
-
 void Spell::EffectSummonRaFFriend(SpellEffIndex effIndex)
 {
     if (effectHandleMode != SPELL_EFFECT_HANDLE_HIT_TARGET)

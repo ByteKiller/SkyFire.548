@@ -551,7 +551,7 @@ void WorldSession::HandleMountSpecialAnimOpcode(WorldPacket& /*recvData*/)
 {
     ObjectGuid guid = GetPlayer()->GetGUID();
 
-    WorldPacket data(SMSG_MOUNTSPECIAL_ANIM, 1 + 8);
+    WorldPacket data(SMSG_MOUNT_SPECIAL_ANIM, 1 + 8);
 
     data.WriteBit(guid[5]);
     data.WriteBit(guid[7]);

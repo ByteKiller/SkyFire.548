@@ -983,6 +983,24 @@ enum TrinityStrings
 
     // FREE IDS                           1228-9999
 
+    // Battle For Gilneas
+    LANG_BG_BFG_START_TWO_MINUTES       = 1250,
+    LANG_BG_BFG_START_ONE_MINUTE        = 1251,
+    LANG_BG_BFG_START_HALF_MINUTE       = 1252,
+    LANG_BG_BFG_HAS_BEGUN               = 1253,
+
+    LANG_BG_BFG_ALLY                    = 1254,
+    LANG_BG_BFG_HORDE                   = 1255,
+    LANG_BG_BFG_NODE_LIGHTHOUSE         = 1256,
+    LANG_BG_BFG_NODE_WATERWORKS         = 1257,
+    LANG_BG_BFG_NODE_MINE               = 1258,
+    LANG_BG_BFG_NODE_TAKEN              = 1259,
+    LANG_BG_BFG_NODE_DEFENDED           = 1260,
+    LANG_BG_BFG_NODE_ASSAULTED          = 1261,
+    LANG_BG_BFG_NODE_CLAIMED            = 1262,
+    LANG_BG_BFG_A_NEAR_VICTORY          = 1263,
+    LANG_BG_BFG_H_NEAR_VICTORY          = 1264,
+
     // AV
     LANG_BG_AV_ALLY                     = 1300,
     LANG_BG_AV_HORDE                    = 1301,
@@ -1021,6 +1039,20 @@ enum TrinityStrings
     LANG_BG_AV_H_CAPTAIN_DEAD           = 1331,
     LANG_BG_AV_A_CAPTAIN_DEAD           = 1332,
     LANG_BG_AV_START_TWO_MINUTES        = 1333,
+    
+    // Temple of Kotmogu
+    LANG_BG_TOK_START_TWO_MINUTE         = 1345,
+    LANG_BG_TOK_START_ONE_MINUTE         = 1346,
+    LANG_BG_TOK_START_HALF_MINUTE        = 1347,
+    LANG_BG_TOK_HAS_BEGUN                = 1348,
+    LANG_BG_TOK_DROPPED                  = 1349,
+    LANG_BG_TOK_PICKEDUP                 = 1350,
+    LANG_BG_TOK_O_PLACED                 = 1351,
+    LANG_BG_TOK_ORB_PURPLE               = 1352,
+    LANG_BG_TOK_ORB_ORANGE               = 1353,
+    LANG_BG_TOK_ORB_GREEN                = 1354,
+    LANG_BG_TOK_ORB_BLUE                 = 1355,
+    LANG_BG_TOK_ORBS_SPAWNED             = 1356,
     // FREE IDS                           1334-1999
 
     // Ticket Strings 2000-2029

@@ -18,8 +18,6 @@
  */
 
 #include "AccountMgr.h"
-#include "ArenaTeam.h"
-#include "ArenaTeamMgr.h"
 #include "Battleground.h"
 #include "CalendarMgr.h"
 #include "Chat.h"
@@ -742,23 +740,9 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recvData)
 {
     ObjectGuid guid;
 
-    guid[1] = recvData.ReadBit();
-    guid[3] = recvData.ReadBit();
-    guid[2] = recvData.ReadBit();
-    guid[7] = recvData.ReadBit();
-    guid[4] = recvData.ReadBit();
-    guid[6] = recvData.ReadBit();
-    guid[0] = recvData.ReadBit();
-    guid[5] = recvData.ReadBit();
+    recvData.ReadGuidMask(guid, 1, 3, 2, 7, 4, 6, 0, 5);
 
-    recvData.ReadByteSeq(guid[7]);
-    recvData.ReadByteSeq(guid[1]);
-    recvData.ReadByteSeq(guid[6]);
-    recvData.ReadByteSeq(guid[0]);
-    recvData.ReadByteSeq(guid[3]);
-    recvData.ReadByteSeq(guid[4]);
-    recvData.ReadByteSeq(guid[2]);
-    recvData.ReadByteSeq(guid[5]);
+    recvData.ReadGuidBytes(guid, 7, 1, 6, 0, 3, 4, 2, 5);
 
     TC_LOG_DEBUG("network", "Character (Guid: %u) deleted", GUID_LOPART(guid));
 
@@ -774,16 +758,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recvData)
     if (sGuildMgr->GetGuildByLeader(guid))
     {
         WorldPacket data(SMSG_CHAR_DELETE, 1);
-        data << uint8(CHAR_DELETE_FAILED_GUILD_LEADER);
-        SendPacket(&data);
-        return;
-    }
-
-    // is arena team captain
-    if (sArenaTeamMgr->GetArenaTeamByCaptain(guid))
-    {
-        WorldPacket data(SMSG_CHAR_DELETE, 1);
-        data << uint8(CHAR_DELETE_FAILED_ARENA_CAPTAIN);
+        data << uint8(CHAR_DELETE_FAILED_GUILD_LEADER + 1); // value different! Looks like all values have been offset by 1, needs more investigation.
         SendPacket(&data);
         return;
     }
@@ -819,7 +794,7 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recvData)
     Player::DeleteFromDB(guid, accountId);
 
     WorldPacket data(SMSG_CHAR_DELETE, 1);
-    data << uint8(CHAR_DELETE_SUCCESS);
+    data << uint8(CHAR_DELETE_SUCCESS + 1);         // value different! Looks like all values have been offset by 1, needs more investigation.
     SendPacket(&data);
 }
 
@@ -2036,7 +2011,7 @@ void WorldSession::HandleEquipmentSetUse(WorldPacket& recvData)
     }
 
     uint8 Reason = 0;
-    WorldPacket data(SMSG_USE_EQUIPMENT_SET_RESULT, 1);
+    WorldPacket data(SMSG_EQUIPMENT_SET_USE_RESULT, 1);
     data << uint8(Reason);                                   // 4 - equipment swap failed - inventory is full
 
     SendPacket(&data);
@@ -2340,9 +2315,6 @@ void WorldSession::HandleCharFactionOrRaceChange(WorldPacket& recvData)
                 trans->Append(stmt);
 
             }
-
-            // Leave Arena Teams
-            Player::LeaveAllArenaTeams(guid);
 
             // Reset homebind and position
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_PLAYER_HOMEBIND);

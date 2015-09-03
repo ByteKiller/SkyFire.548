@@ -246,6 +246,22 @@ enum Powers
 
 #define MAX_POWERS_PER_CLASS            5
 
+enum BattlePayDistribution
+{
+    // character boost
+    CHARACTER_BOOST                     = 2,
+    CHARACTER_BOOST_ALLOW               = 1,
+    CHARACTER_BOOST_CHOOSED             = 2,
+    CHARACTER_BOOST_ITEMS               = 3,
+    CHARACTER_BOOST_APPLIED             = 4,
+    CHARACTER_BOOST_TEXT_ID             = 88,
+    CHARACTER_BOOST_SPEC_MASK           = 0xFFF,
+    CHARACTER_BOOST_FACTION_ALLIANCE    = 0x1000000
+};
+
+#define CHARACTER_BOOST_BONUS_TEXT      "Boost your character to level 90!"
+#define CHARACTER_BOOST_BONUS_TEXT2     "Level 90 Character Boost"
+
 enum SpellSchools
 {
     SPELL_SCHOOL_NORMAL                 = 0,
@@ -771,6 +787,8 @@ enum Specializations
 #define MIN_TALENT_SPECS        1
 #define MAX_TALENT_SPECS        2
 #define MAX_GLYPH_SLOT_INDEX    6
+#define MIN_SPECIALIZATION_LEVEL    10
+#define MAX_SPECIALIZATIONS     4
 
 // Custom values
 enum SpellClickUserTypes
@@ -869,13 +887,15 @@ enum Team
 {
     HORDE               = 67,
     ALLIANCE            = 469,
-    //TEAM_STEAMWHEEDLE_CARTEL = 169,                       // not used in code
+    //TEAM_STEAMWHEEDLE_CARTEL = 169,                   // not used in code
     //TEAM_ALLIANCE_FORCES     = 891,
     //TEAM_HORDE_FORCES        = 892,
     //TEAM_SANCTUARY           = 936,
     //TEAM_OUTLAND             = 980,
-    TEAM_OTHER               = 0                            // if ReputationListId > 0 && Flags != FACTION_FLAG_TEAM_HEADER
+    PANDAREN_NEUTRAL     = 1249,                        // Pandaren is neutral on start
+    TEAM_OTHER           = 0                            // if ReputationListId > 0 && Flags != FACTION_FLAG_TEAM_HEADER
 };
+
 
 enum SpellEffects
 {
@@ -3233,8 +3253,12 @@ enum HolidayIds
     HOLIDAY_RATED_BG_25_VS_25        = 443,
     HOLIDAY_ANNIVERSARY_7_YEARS      = 467,
     HOLIDAY_DARKMOON_FAIRE_TEROKKAR  = 479,
-    HOLIDAY_ANNIVERSARY_8_YEARS      = 484
+    HOLIDAY_ANNIVERSARY_8_YEARS      = 484,
+    HOLIDAY_CALL_TO_ARMS_SM          = 488,
+    HOLIDAY_CALL_TO_ARMS_TOK         = 489,
+    HOLIDAY_CALL_TO_ARMS_DG          = 515
 };
+
 
 // values based at QuestInfo.dbc
 enum QuestTypes
@@ -4126,10 +4150,14 @@ enum BattlegroundQueueTypeId
     BATTLEGROUND_QUEUE_IC       = 6,
     BATTLEGROUND_QUEUE_TP       = 7,
     BATTLEGROUND_QUEUE_BFG      = 8,
-    BATTLEGROUND_QUEUE_RB       = 9,
-    BATTLEGROUND_QUEUE_2v2      = 10,
-    BATTLEGROUND_QUEUE_3v3      = 11,
-    BATTLEGROUND_QUEUE_5v5      = 12,
+    BATTLEGROUND_QUEUE_TOK      = 9,
+    BATTLEGROUND_QUEUE_DG       = 10,
+    BATTLEGROUND_QUEUE_SM       = 11,
+    BATTLEGROUND_QUEUE_RB       = 12,
+    BATTLEGROUND_QUEUE_2v2      = 13,
+    BATTLEGROUND_QUEUE_3v3      = 14,
+    BATTLEGROUND_QUEUE_5v5      = 15,
+    BATTLEGROUND_QUEUE_10v10    = 16,
     MAX_BATTLEGROUND_QUEUE_TYPES
 };
 

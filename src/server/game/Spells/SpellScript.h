@@ -132,6 +132,7 @@ enum SpellScriptHookType
     SPELL_SCRIPT_HOOK_EFFECT_LAUNCH_TARGET,
     SPELL_SCRIPT_HOOK_EFFECT_HIT,
     SPELL_SCRIPT_HOOK_EFFECT_HIT_TARGET,
+    SPELL_SCRIPT_HOOK_EFFECT_SUCCESSFUL_DISPEL,
     SPELL_SCRIPT_HOOK_BEFORE_HIT,
     SPELL_SCRIPT_HOOK_HIT,
     SPELL_SCRIPT_HOOK_AFTER_HIT,
@@ -280,6 +281,7 @@ class SpellScript : public _SpellScript
         HookList<EffectHandler> OnEffectLaunchTarget;
         HookList<EffectHandler> OnEffectHit;
         HookList<EffectHandler> OnEffectHitTarget;
+        HookList<EffectHandler> OnEffectSuccessfulDispel;
         #define SpellEffectFn(F, I, N) EffectHandlerFunction(&F, I, N)
 
         // example: BeforeHit += SpellHitFn(class::function);

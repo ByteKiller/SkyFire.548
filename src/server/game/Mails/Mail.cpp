@@ -98,12 +98,13 @@ void MailDraft::prepareItems(Player* receiver, SQLTransaction& trans)
     // can be empty
     mailLoot.FillLoot(m_mailTemplateId, LootTemplates_Mail, receiver, true, true);
 
+    uint64 playerGuid = receiver->GetGUID();
     uint32 max_slot = mailLoot.GetMaxSlotInLootFor(receiver);
     for (uint32 i = 0; m_items.size() < MAX_MAIL_ITEMS && i < max_slot; ++i)
     {
         if (LootItem* lootitem = mailLoot.LootItemInSlot(i, receiver))
         {
-            if (Item* item = Item::CreateItem(lootitem->itemid, lootitem->count, receiver))
+            if (Item* item = Item::CreateItem(lootitem->itemid, lootitem->count, playerGuid))
             {
                 item->SaveToDB(trans);                           // save for prevent lost at next mail load, if send fail then item will deleted
                 AddItem(item);

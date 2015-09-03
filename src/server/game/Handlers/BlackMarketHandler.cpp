@@ -59,7 +59,7 @@ void WorldSession::HandleBlackMarketHelloOpcode(WorldPacket& recvData)
 void WorldSession::SendBlackMarketHello(uint64 npcGuid)
 {
     bool Open = sWorld->getBoolConfig(CONFIG_BLACK_MARKET_OPEN);
-    WorldPacket data(SMSG_BLACKMARKET_HELLO, 9);
+    WorldPacket data(SMSG_BLACK_MARKET_HELLO, 9);
 
     ObjectGuid UnitGUID = npcGuid;
 
@@ -115,7 +115,7 @@ void WorldSession::HandleBlackMarketRequestItemOpcode(WorldPacket& recvData)
 
 void WorldSession::SendBlackMarketRequestItemsResult()
 {
-    WorldPacket data(SMSG_BLACKMARKET_REQUEST_ITEMS_RESULT);
+    WorldPacket data(SMSG_BLACK_MARKET_REQUEST_ITEMS_RESULT);
     
     sBlackMarketMgr->BuildBlackMarketRequestItemsResult(data, GetPlayer()->GetGUIDLow());
 
@@ -198,7 +198,7 @@ void WorldSession::HandleBlackMarketBidOnItem(WorldPacket& recvData)
 
 void WorldSession::SendBlackMarketBidOnItemResult(uint32 ItemID)
 {
-    WorldPacket data(SMSG_BLACKMARKET_BID_RESULT, 12);
+    WorldPacket data(SMSG_BLACK_MARKET_BID_RESULT, 12);
     data << uint32(2);              // MarketID might be Result
     data << uint32(ItemID);         // ItemID
     data << uint32(2);              // Result might be MarketID

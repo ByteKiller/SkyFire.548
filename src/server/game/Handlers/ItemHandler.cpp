@@ -322,12 +322,12 @@ void WorldSession::HandleReadItem(WorldPacket& recvData)
         InventoryResult msg = _player->CanUseItem(pItem);
         if (msg == EQUIP_ERR_OK)
         {
-            data.Initialize(SMSG_READ_ITEM_RESULT_OK, 8);
+            data.Initialize(SMSG_READ_ITEM_OK, 8);
             TC_LOG_INFO("network", "STORAGE: Item page sent");
         }
         else
         {
-            data.Initialize(SMSG_READ_ITEM_RESULT_FAILED, 8);
+            data.Initialize(SMSG_READ_ITEM_FAILED, 8);
             TC_LOG_INFO("network", "STORAGE: Unable to read item");
             _player->SendEquipError(msg, pItem, NULL);
         }
@@ -1908,5 +1908,79 @@ void WorldSession::SendItemExpirePurchaseRefund(ObjectGuid itemGuid)
     data.WriteByteSeq(itemGuid[3]);
     data.WriteByteSeq(itemGuid[5]);
 
+    SendPacket(&data);
+}
+
+void WorldSession::HandleUpgradeItem(WorldPacket& recvData)
+{
+    TC_LOG_DEBUG("network", "WORLD: CMSG_UPGRADE_ITEM");
+
+    uint32 ItemPos, Bag, ItemUpgradeId;
+
+    ObjectGuid guid, guid2;
+    Player* player = GetPlayer();
+
+    recvData >> ItemPos >> Bag >> ItemUpgradeId;
+
+    guid2[5] = recvData.ReadBit();
+    guid[6] = recvData.ReadBit();
+    recvData.ReadGuidMask(guid2, 6, 0, 1);
+    recvData.ReadGuidMask(guid, 4, 1, 7);
+    recvData.ReadGuidMask(guid2, 7, 2, 3);
+    recvData.ReadGuidMask(guid, 0, 2, 5);
+    guid2[4] = recvData.ReadBit();
+    guid[3] = recvData.ReadBit();
+
+    recvData.ReadByteSeq(guid2[7]);
+    recvData.ReadByteSeq(guid[6]);
+    recvData.ReadByteSeq(guid2[6]);
+    recvData.ReadGuidBytes(guid, 3, 2);
+    recvData.ReadByteSeq(guid2[5]);
+    recvData.ReadByteSeq(guid[1]);
+    recvData.ReadByteSeq(guid2[1]);
+    recvData.ReadByteSeq(guid[0]);
+    recvData.ReadGuidBytes(guid2, 2, 0);
+    recvData.ReadGuidBytes(guid, 4, 5);
+    recvData.ReadByteSeq(guid2[3]);
+    recvData.ReadByteSeq(guid[7]);
+    recvData.ReadByteSeq(guid2[4]);
+
+    TC_LOG_DEBUG("network", "WORLD: HandleUpgradeItem ItemPos: %u, Bag: %u, ItemUpgradeId: %u", ItemPos, Bag, ItemUpgradeId);
+
+    Item* item = player->GetItemByPos(Bag, ItemPos);
+    if (!item)
+    {
+        TC_LOG_INFO("network", "WORLD: HandleUpgradeItem - Player (Guid: %u Name: %s) tried to upgrade an invalid/non-existant item.", player->GetGUIDLow(), player->GetName().c_str());
+        SendItemUpgradeResult(false);
+        return;
+    }
+
+    if (!ItemUpgradeId)
+    {
+        item->SetDynamicUInt32Value(ITEM_DYNAMIC_MODIFIERS, 0, 0);
+
+        if (!item->GetDynamicUInt32Value(ITEM_DYNAMIC_MODIFIERS, 3))
+            item->SetFlag(ITEM_FIELD_MODIFIERS_MASK, 0);
+
+        item->SetState(ITEM_CHANGED, player);
+        return;
+    }
+
+    item->SetDynamicUInt32Value(ITEM_DYNAMIC_MODIFIERS, 0, ItemUpgradeId);
+    item->SetFlag(ITEM_FIELD_MODIFIERS_MASK, 3);
+    item->SetState(ITEM_CHANGED, player);
+
+    SendItemUpgradeResult(true);
+
+    //if (item->IsEquipped())
+    //    player->ApplyUpgradeEnchantment(item, ItemUpgradeId);
+}
+
+void WorldSession::SendItemUpgradeResult(uint32 result)
+{
+    TC_LOG_DEBUG("network", "WORLD: SMSG_ITEM_UPGRADE_RESULT");
+
+    WorldPacket data(SMSG_ITEM_UPGRADE_RESULT, 4);
+    data << uint32(result);
     SendPacket(&data);
 }

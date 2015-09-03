@@ -75,7 +75,7 @@ void WorldSession::SendTaxiStatus(uint64 guid)
     TC_LOG_DEBUG("network", "WORLD: current location %u ", curloc);
 
     ObjectGuid Guid = guid;
-    WorldPacket data(SMSG_TAXI_NODE_STATUS, 9);
+    WorldPacket data(SMSG_TAXINODE_STATUS, 9);
 
     data.WriteBit(Guid[6]);
     data.WriteBit(Guid[2]);
@@ -159,7 +159,7 @@ void WorldSession::SendTaxiMenu(Creature* unit)
     TC_LOG_DEBUG("network", "WORLD: CMSG_TAXI_NODE_STATUS_QUERY %u ", curloc);
     ObjectGuid Guid = unit->GetGUID();
 
-    WorldPacket data(SMSG_SHOW_TAXI_NODES, (4 + 8 + 4 + 8 * 4));
+    WorldPacket data(SMSG_SHOWTAXINODES, (4 + 8 + 4 + 8 * 4));
     data.WriteBit(1); //unk
     data.WriteBit(Guid[3]);
     data.WriteBit(Guid[0]);
@@ -219,7 +219,7 @@ bool WorldSession::SendLearnNewTaxiNode(Creature* unit)
         SendPacket(&msg);
 
         ObjectGuid Guid = unit->GetGUID();
-        WorldPacket update(SMSG_TAXI_NODE_STATUS, 9);
+        WorldPacket update(SMSG_TAXINODE_STATUS, 9);
 
         update.WriteBit(Guid[6]);
         update.WriteBit(Guid[2]);
@@ -423,7 +423,7 @@ void WorldSession::HandleActivateTaxiOpcode(WorldPacket& recvData)
 
 void WorldSession::SendActivateTaxiReply(ActivateTaxiReply reply)
 {
-    WorldPacket data(SMSG_ACTIVATE_TAXI_REPLY, 1);
+    WorldPacket data(SMSG_ACTIVATETAXIREPLY, 1);
     data.WriteBits(reply, 4);
     data.FlushBits();
     SendPacket(&data);

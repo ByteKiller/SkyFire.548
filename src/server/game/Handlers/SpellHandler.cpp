@@ -1414,7 +1414,7 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
 
     if (Player* player = creator->ToPlayer())
     {
-        WorldPacket data(SMSG_MIRROR_IMAGE_COMPONENTED_DATA, 8 + 4 + 8 * 1 + 8 + 11 * 4);
+        WorldPacket data(SMSG_MIRRORIMAGE_DATA, 8 + 4 + 8 * 1 + 8 + 11 * 4);
         Guild* guild = NULL;
         ObjectGuid guildGuid = guild ? guild->GetGUID() : 0;
 

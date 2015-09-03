@@ -1155,10 +1155,19 @@ std::list<uint32> GetSpellsForLevels(uint32 classId, uint32 raceMask, uint32 spe
     return spellList;
 }
 
+std::vector<uint32> const* GetSpecializationSpells(uint32 specializationId)
+{
+    SpecializationSpellsMap::const_iterator specIter = sSpecializationSpellsMap.find(specializationId);
+    if (specIter != sSpecializationSpellsMap.end())
+        return &specIter->second;
+
+    return nullptr;
+}
+
 MapDifficulty const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty)
 {
     MapDifficultyMap::const_iterator itr = sMapDifficultyMap.find(MAKE_PAIR32(mapId, difficulty));
-    return itr != sMapDifficultyMap.end() ? &itr->second : NULL;
+    return itr != sMapDifficultyMap.end() ? &itr->second : nullptr;
 }
 
 MapDifficulty const* GetDownscaledMapDifficultyData(uint32 mapId, Difficulty &difficulty)

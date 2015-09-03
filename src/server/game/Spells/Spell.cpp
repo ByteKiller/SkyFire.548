@@ -4713,7 +4713,7 @@ void Spell::SendLogExecute()
     ObjectGuid guid = m_caster->GetGUID();
 
     // TODO: Finish me
-    WorldPacket data(SMSG_SPELLLOGEXECUTE, (8+4+4+4+4+8));
+    WorldPacket data(SMSG_SPELL_LOG_EXECUTE, (8+4+4+4+4+8));
     /*
     data.WriteBit(0);
     data.WriteBit(guid[6]);
@@ -4788,7 +4788,7 @@ void Spell::ExecuteLogEffectInterruptCast(uint8 /*effIndex*/, Unit* victim, uint
     ObjectGuid casterGuid = m_caster->GetGUID();
     ObjectGuid targetGuid = victim->GetGUID();
 
-    WorldPacket data(SMSG_SPELLINTERRUPTLOG, 8 + 8 + 4 + 4);
+    WorldPacket data(SMSG_SPELL_INTERRUPT_LOG, 8 + 8 + 4 + 4);
     data.WriteBit(targetGuid[7]);
     data.WriteBit(targetGuid[2]);
     data.WriteBit(targetGuid[4]);
@@ -4940,28 +4940,14 @@ void Spell::SendChannelUpdate(uint32 time)
         m_caster->SetUInt32Value(UNIT_FIELD_CHANNEL_SPELL, 0);
     }
 
-    ObjectGuid CasterGUID = m_caster->GetGUID();
-
-    WorldPacket data(SMSG_SPELL_CHANNEL_UPDATE, 8+4);
-
-    data.WriteBit(CasterGUID[0]);
-    data.WriteBit(CasterGUID[3]);
-    data.WriteBit(CasterGUID[4]);
-    data.WriteBit(CasterGUID[1]);
-    data.WriteBit(CasterGUID[5]);
-    data.WriteBit(CasterGUID[2]);
-    data.WriteBit(CasterGUID[6]);
-    data.WriteBit(CasterGUID[7]);
-
-    data.WriteByteSeq(CasterGUID[4]);
-    data.WriteByteSeq(CasterGUID[7]);
-    data.WriteByteSeq(CasterGUID[1]);
-    data.WriteByteSeq(CasterGUID[2]);
-    data.WriteByteSeq(CasterGUID[6]);
-    data.WriteByteSeq(CasterGUID[5]);
+    WorldPacket data(SMSG_CHANNEL_UPDATE, 8 + 4);
+    ObjectGuid guid = m_caster->GetGUID();
+    data.WriteGuidMask(guid, 0, 3, 4, 1, 5, 2, 6, 7);
+    
+    data.WriteGuidBytes(guid, 4, 7, 1, 2, 6, 5);
     data << uint32(time);
-    data.WriteByteSeq(CasterGUID[0]);
-    data.WriteByteSeq(CasterGUID[3]);
+    data.WriteGuidBytes(guid, 0, 3);
+
     m_caster->SendMessageToSet(&data, true);
 }
 
@@ -4972,56 +4958,70 @@ void Spell::SendChannelStart(uint32 duration)
         if (m_UniqueTargetInfo.size() + m_UniqueGOTargetInfo.size() == 1)   // this is for TARGET_SELECT_CATEGORY_NEARBY
             channelTarget = !m_UniqueTargetInfo.empty() ? m_UniqueTargetInfo.front().targetGUID : m_UniqueGOTargetInfo.front().targetGUID;
 
-    uint32 SchoolImmunityMask = m_caster->GetSchoolImmunityMask();
-    uint32 MechanicImmunityMask = m_caster->GetMechanicImmunityMask();
-    ObjectGuid CasterGUID = m_caster->GetGUID();
-
-    WorldPacket data(SMSG_SPELL_CHANNEL_START, (8+4+4/*+8+4+1+8*/));
-
-    data.WriteBit(CasterGUID[7]);
-    data.WriteBit(CasterGUID[5]);
-    data.WriteBit(CasterGUID[4]);
-    data.WriteBit(CasterGUID[1]);
-
+    WorldPacket data(SMSG_CHANNEL_START, (8+4+4));
+    ObjectGuid guid = m_caster->GetGUID();
+    
+    data.WriteGuidMask(guid, 7, 5, 4, 1);
+    
     data.WriteBit(0); // healPrediction
-
-    data.WriteBit(CasterGUID[3]);
-    data.WriteBit(CasterGUID[2]);
-    data.WriteBit(CasterGUID[0]);
-    data.WriteBit(CasterGUID[6]);
-
-    if (SchoolImmunityMask || MechanicImmunityMask)
-        data.WriteBit(1);
-    else
-        data.WriteBit(0);
-
+    
     /*
     if (healPrediction)
     {
-    data.appendPackGUID(channelTarget);     // target packguid
-    data << uint32();                       // spellid
-    data << uint8(0);                       // unk3
-    if (unk3 == 2)
-    data.append();                      // unk packed guid (unused ?)
+        packet.ReadGuidMask(targetGUD, 2, 6, 4);
+
+        hasType = !packet.ReadBit();
+
+        packet.ReadGuidMask(targetGUD, 3, 7, 5, 1, 2);
+        
+        hasHealAmount = !packet.ReadBit();
+        packet.ReadBit(); // fake bit
+
+        packet.StartBitStream(guid2, 4, 5, 1, 7, 0, 2, 3, 6);
     }
     */
 
-    if (SchoolImmunityMask || MechanicImmunityMask)
+    data.WriteGuidMask(guid, 3, 2, 0, 6);
+    
+    data.WriteBit(0); // immunity
+   
+    /*
+    if (healPrediction)
     {
-        data << uint32(SchoolImmunityMask);                       // SchoolImmunityMask
-        data << uint32(MechanicImmunityMask);                     // MechanicImmunityMask
-    }
+        packet.ParseBitStream(guid2, 4, 6, 1, 0, 7, 3, 2, 5);
+        
+        if (hasType)
+            packet.ReadByte("Type");
+            
+        packet.ReadXORByte(targetGUD, 4);
+        packet.ReadXORByte(targetGUD, 5);
+        packet.ReadXORByte(targetGUD, 1);
+        packet.ReadXORByte(targetGUD, 3);
+        
+        if (hasHealAmount)
+            packet.ReadInt32("Heal Amount");
 
-    data.WriteByteSeq(CasterGUID[6]);
-    data.WriteByteSeq(CasterGUID[7]);
-    data.WriteByteSeq(CasterGUID[3]);
-    data.WriteByteSeq(CasterGUID[1]);
-    data.WriteByteSeq(CasterGUID[0]);
+        packet.ReadXORByte(targetGUD, 6);
+        packet.ReadXORByte(targetGUD, 7);
+        packet.ReadXORByte(targetGUD, 2);
+        packet.ReadXORByte(targetGUD, 0);
+
+        packet.WriteGuid("TargetGUD", targetGUD);
+        packet.WriteGuid("Guid2", guid2);
+    }
+    */
+    /*
+    if (immunity)
+    {
+        data << uint32(); // CastSchoolImmunities
+        data << uint32(); // CastImmunities
+    }
+    */
+    
+    data.WriteGuidBytes(guid, 6, 7, 3, 1, 0);
     data << uint32(duration);
-    data.WriteByteSeq(CasterGUID[5]);
-    data.WriteByteSeq(CasterGUID[4]);
-    data.WriteByteSeq(CasterGUID[2]);
-    data << uint32(m_spellInfo->Id);  
+    data.WriteGuidBytes(guid, 5, 4, 2);
+    data << uint32(m_spellInfo->Id);
 
     m_caster->SendMessageToSet(&data, true);
 
@@ -7836,6 +7836,19 @@ void Spell::CallScriptAfterHitHandlers()
         std::list<SpellScript::HitHandler>::iterator hookItrEnd = (*scritr)->AfterHit.end(), hookItr = (*scritr)->AfterHit.begin();
         for (; hookItr != hookItrEnd; ++hookItr)
             (*hookItr).Call(*scritr);
+
+        (*scritr)->_FinishScriptCall();
+    }
+}
+
+void Spell::CallScriptSuccessfulDispel(SpellEffIndex effIndex)
+{
+    for (std::list<SpellScript*>::iterator scritr = m_loadedScripts.begin(); scritr != m_loadedScripts.end(); ++scritr)
+    {
+        (*scritr)->_PrepareScriptCall(SPELL_SCRIPT_HOOK_EFFECT_SUCCESSFUL_DISPEL);
+        std::list<SpellScript::EffectHandler>::iterator hookItrEnd = (*scritr)->OnEffectSuccessfulDispel.end(), hookItr = (*scritr)->OnEffectSuccessfulDispel.begin();
+        for (; hookItr != hookItrEnd; ++hookItr)
+            hookItr->Call(*scritr, effIndex);
 
         (*scritr)->_FinishScriptCall();
     }

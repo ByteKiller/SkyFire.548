@@ -273,9 +273,10 @@ Item::Item()
     }
 }
 
-bool Item::Create(uint32 guidlow, uint32 itemid, Player const* owner)
+bool Item::Create(uint32 guidlow, uint32 itemid, uint64 playerGuid)
 {
     Object::_Create(guidlow, 0, HIGHGUID_ITEM);
+    Player* owner = nullptr;
 
     SetEntry(itemid);
     SetObjectScale(1.0f);
@@ -1066,7 +1067,7 @@ void Item::SendTimeUpdate(Player* owner)
     owner->GetSession()->SendPacket(&data);
 }
 
-Item* Item::CreateItem(uint32 itemEntry, uint32 count, Player const* player)
+Item* Item::CreateItem(uint32 itemEntry, uint32 count, uint64 playerGuid)
 {
     if (count < 1)
         return NULL;                                        //don't create item at zero count
@@ -1080,7 +1081,7 @@ Item* Item::CreateItem(uint32 itemEntry, uint32 count, Player const* player)
         ASSERT(count != 0 && "pProto->Stackable == 0 but checked at loading already");
 
         Item* item = NewItemOrBag(proto);
-        if (item->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_ITEM), itemEntry, player))
+        if (item->Create(sObjectMgr->GenerateLowGuid(HIGHGUID_ITEM), itemEntry, playerGuid))
         {
             item->SetCount(count);
             return item;
@@ -1095,7 +1096,8 @@ Item* Item::CreateItem(uint32 itemEntry, uint32 count, Player const* player)
 
 Item* Item::CloneItem(uint32 count, Player const* player) const
 {
-    Item* newItem = CreateItem(GetEntry(), count, player);
+    uint64 guid = player->GetGUID();
+    Item* newItem = CreateItem(GetEntry(), count, guid);
     if (!newItem)
         return NULL;
 

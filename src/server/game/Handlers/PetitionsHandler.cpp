@@ -23,12 +23,10 @@
 #include "WorldSession.h"
 #include "World.h"
 #include "ObjectMgr.h"
-#include "ArenaTeamMgr.h"
 #include "GuildMgr.h"
 #include "Log.h"
 #include "Opcodes.h"
 #include "Guild.h"
-#include "ArenaTeam.h"
 #include "GossipDef.h"
 #include "SocialMgr.h"
 
@@ -530,23 +528,9 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recvData)
     ObjectGuid petitionGuid;
 
     recvData.read_skip<uint8>();
-    petitionGuid[4] = recvData.ReadBit();
-    petitionGuid[2] = recvData.ReadBit();
-    petitionGuid[0] = recvData.ReadBit();
-    petitionGuid[1] = recvData.ReadBit();
-    petitionGuid[5] = recvData.ReadBit();
-    petitionGuid[3] = recvData.ReadBit();
-    petitionGuid[6] = recvData.ReadBit();
-    petitionGuid[7] = recvData.ReadBit();
+    recvData.ReadGuidMask(petitionGuid, 4, 2, 0, 1, 5, 3, 6, 7);
 
-    recvData.ReadByteSeq(petitionGuid[6]);
-    recvData.ReadByteSeq(petitionGuid[1]);
-    recvData.ReadByteSeq(petitionGuid[7]);
-    recvData.ReadByteSeq(petitionGuid[2]);
-    recvData.ReadByteSeq(petitionGuid[5]);
-    recvData.ReadByteSeq(petitionGuid[3]);
-    recvData.ReadByteSeq(petitionGuid[0]);
-    recvData.ReadByteSeq(petitionGuid[4]);
+    recvData.ReadGuidBytes(petitionGuid, 6, 1, 7, 2, 5, 3, 0, 4);
 
     PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_PETITION_SIGNATURES);
 
@@ -573,10 +557,7 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recvData)
     // not let enemies sign guild charter
     if (!sWorld->getBoolConfig(CONFIG_ALLOW_TWO_SIDE_INTERACTION_GUILD) && GetPlayer()->GetTeam() != sObjectMgr->GetPlayerTeamByGUID(ownerGuid))
     {
-        if (type != GUILD_CHARTER_TYPE)
-            SendArenaTeamCommandResult(ERR_ARENA_TEAM_INVITE_SS, "", "", ERR_ARENA_TEAM_NOT_ALLIED);
-        else
-            Guild::SendCommandResult(this, GUILD_COMMAND_CREATE, ERR_GUILD_NOT_ALLIED);
+        Guild::SendCommandResult(this, GUILD_COMMAND_CREATE, ERR_GUILD_NOT_ALLIED);
         return;
     }
 

@@ -16,6 +16,7 @@ file(GLOB_RECURSE sources_AI AI/*.cpp AI/*.h)
 file(GLOB_RECURSE sources_AuctionHouse AuctionHouse/*.cpp AuctionHouse/*.h)
 file(GLOB_RECURSE sources_Battlefield Battlefield/*.cpp Battlefield/*.h)
 file(GLOB_RECURSE sources_Battlegrounds Battlegrounds/*.cpp Battlegrounds/*.h)
+file(GLOB_RECURSE sources_BattlePay BattlePay/*.cpp BattlePay/*.h)
 file(GLOB_RECURSE sources_BattlePet BattlePet/*.cpp BattlePet/*.h)
 file(GLOB_RECURSE sources_BlackMarket BlackMarket/*.cpp BlackMarket/*.h)
 file(GLOB_RECURSE sources_Calendar Calendar/*.cpp Calendar/*.h)
@@ -61,6 +62,7 @@ source_group(AI FILES ${sources_AI})
 source_group(AuctionHouse FILES ${sources_AuctionHouse})
 source_group(Battlefield FILES ${sources_Battlefield})
 source_group(Battlegrounds FILES ${sources_Battlegrounds})
+source_group(BattlePay FILES ${sources_BattlePay})
 source_group(BattlePet FILES ${sources_BattlePet})
 source_group(BlackMarket FILES ${sources_BlackMarket})
 source_group(Calendar FILES ${sources_Calendar})
@@ -113,6 +115,7 @@ set(game_STAT_SRCS
   ${sources_AuctionHouse}
   ${sources_Battlefield}
   ${sources_Battlegrounds}
+  ${sources_BattlePay}
   ${sources_BattlePet}
   ${sources_BlackMarket}
   ${sources_Calendar}

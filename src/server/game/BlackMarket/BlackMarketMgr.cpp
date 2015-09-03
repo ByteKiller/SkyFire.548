@@ -355,7 +355,7 @@ void BlackMarketMgr::SendAuctionOutbidded(BlackMarketAuction* auction, uint32 ne
     {
         if (bidder)
         {
-            WorldPacket data(SMSG_BLACKMARKET_OUT_BID, 12);
+            WorldPacket data(SMSG_BLACK_MARKET_OUT_BID, 12);
 
             data << uint32(auction->GetTemplate()->ItemEntry);
             data << uint32(1);
@@ -379,7 +379,7 @@ void BlackMarketMgr::SendAuctionWon(BlackMarketAuction* auction, SQLTransaction&
     {
         if (bidder)
         {
-            WorldPacket data(SMSG_BLACKMARKET_BID_WON, 12);
+            WorldPacket data(SMSG_BLACK_MARKET_BID_WON, 12);
             data << uint32(1);                                  // 6 - might be OK - 6 (win msg recvd)
             data << uint32(auction->GetTemplate()->ItemEntry);  // 4 - ItemEntry
             data << uint32(1);                                  // 5 - might be OK - 5 (win msg recvd)
@@ -391,7 +391,7 @@ void BlackMarketMgr::SendAuctionWon(BlackMarketAuction* auction, SQLTransaction&
         if (!itemTemplate)
             return;
 
-        Item* pItem = Item::CreateItem(auction->GetTemplate()->ItemEntry, auction->GetTemplate()->Quantity, bidder);
+        Item* pItem = Item::CreateItem(auction->GetTemplate()->ItemEntry, auction->GetTemplate()->Quantity, bidder_guid);
 
         MailDraft draft(auction->BuildAuctionMailSubject(BM_AUCTION_WON), auction->BuildAuctionMailBody(auction->GetCurrentBidder()));
         

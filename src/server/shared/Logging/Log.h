@@ -35,7 +35,7 @@ class Log
 {
     friend class ACE_Singleton<Log, ACE_Thread_Mutex>;
 
-    typedef UNORDERED_MAP<std::string, Logger> LoggerMap;
+    typedef std::unordered_map<std::string, Logger> LoggerMap;
 
     private:
         Log();
@@ -53,9 +53,11 @@ class Log
         void outWarn(std::string const& f, char const* str, ...) ATTR_PRINTF(3, 4);
         void outError(std::string const& f, char const* str, ...) ATTR_PRINTF(3, 4);
         void outFatal(std::string const& f, char const* str, ...) ATTR_PRINTF(3, 4);
-
         void outCommand(uint32 account, const char * str, ...) ATTR_PRINTF(3, 4);
         void outCharDump(char const* str, uint32 account_id, uint32 guid, char const* name);
+
+        void EnableDBAppenders();
+
         static std::string GetTimestampStr();
 
         void SetRealmId(uint32 id);
@@ -149,5 +151,17 @@ inline bool Log::ShouldLog(std::string const& type, LogLevel level) const
 
 #define TC_LOG_FATAL(filterType__, ...) \
     TC_LOG_MESSAGE_BODY(LOG_LEVEL_FATAL, outFatal, filterType__, __VA_ARGS__)
+
+#define TC_LOG_ARENA(filterType__, ...) \
+    TC_LOG_MESSAGE_BODY(LOG_LEVEL_FATAL, outArena, filterType__, __VA_ARGS__)
+
+#define TC_LOG_FEENIX(filterType__, ...) \
+    TC_LOG_MESSAGE_BODY(LOG_LEVEL_FATAL, outFeenix, filterType__, __VA_ARGS__)
+
+#define TC_LOG_GM(filterType__, ...) \
+    TC_LOG_MESSAGE_BODY(LOG_LEVEL_FATAL, outGmChat, filterType__, __VA_ARGS__)
+
+#define TC_LOG_COMMAND(filterType__, ...) \
+    TC_LOG_MESSAGE_BODY(LOG_LEVEL_FATAL, outCommand, filterType__, __VA_ARGS__)
 
 #endif

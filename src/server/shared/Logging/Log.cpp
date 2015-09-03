@@ -383,7 +383,6 @@ void Log::outFatal(std::string const& filter, const char * str, ...)
 
     va_end(ap);
 }
-
 void Log::outCharDump(char const* str, uint32 accountId, uint32 guid, char const* name)
 {
     if (!str || !ShouldLog("entities.player.dump", LOG_LEVEL_INFO))
@@ -391,7 +390,7 @@ void Log::outCharDump(char const* str, uint32 accountId, uint32 guid, char const
 
     std::ostringstream ss;
     ss << "== START DUMP == (account: " << accountId << " guid: " << guid << " name: " << name
-       << ")\n" << str << "\n== END DUMP ==\n";
+        << ")\n" << str << "\n== END DUMP ==\n";
 
     LogMessage* msg = new LogMessage(LOG_LEVEL_INFO, "entities.player.dump", ss.str());
     std::ostringstream param;

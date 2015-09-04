@@ -1432,6 +1432,15 @@ LFGDungeonEntry const* GetLFGDungeon(uint32 mapId, Difficulty difficulty)
     return NULL;
 }
 
+DigsitePOIPolygon const* GetDigsitePOIPolygon(uint32 digsiteId)
+{
+    DigsitePOIPolygonContainer::const_iterator itr = sDigsitePOIPolygons.find(digsiteId);
+    if (itr != sDigsitePOIPolygons.end())
+        return &itr->second;
+
+    return NULL;
+}
+
 SkillRaceClassInfoEntry const* GetSkillRaceClassInfo(uint32 skill, uint8 race, uint8 class_)
 {
     SkillRaceClassInfoBounds bounds = SkillRaceClassInfoBySkill.equal_range(skill);

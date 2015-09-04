@@ -524,11 +524,12 @@ class WorldSession
         void HandlePlayerLoginOpcode(WorldPacket& recvPacket);
         void HandleLoadScreenOpcode(WorldPacket& recvPacket);
         void HandleCharEnum(PreparedQueryResult result);
-        void HandlePlayerLogin(LoginQueryHolder * holder);
+        void HandlePlayerLogin(LoginQueryHolder * holder, PreparedQueryResult accountResult);
         void HandleCharFactionOrRaceChange(WorldPacket& recvData);
         void HandleRandomizeCharNameOpcode(WorldPacket& recvData);
         void HandleReorderCharacters(WorldPacket& recvData);
         void HandleOpeningCinematic(WorldPacket& recvData);
+        void RefreshSpellModsOnLoadScreen();
 
         // played time
         void HandlePlayedTime(WorldPacket& recvPacket);
@@ -1082,9 +1083,8 @@ class WorldSession
         void SendBlackMarketHello(uint64 guid);
         void HandleBlackMarketRequestItemOpcode(WorldPacket& recvData);
         void SendBlackMarketRequestItemsResult();
-
-        void HandleBlackMarketBidOnItem(WorldPacket& recvData);
-        void SendBlackMarketBidOnItemResult(uint32 ItemID);
+        void HandleBlackMarketBidOpcode(WorldPacket& recvData);
+        void SendBlackMarketBidResult();
 
         // Miscellaneous
         void HandleSpellClick(WorldPacket& recvData);
@@ -1157,6 +1157,7 @@ class WorldSession
         PreparedQueryResultFuture _charEnumCallback;
         PreparedQueryResultFuture _addIgnoreCallback;
         PreparedQueryResultFuture _stablePetCallback;
+        PreparedQueryResultFuture _accountSpellCallback;
         QueryCallback<PreparedQueryResult, std::string> _charRenameCallback;
         QueryCallback<PreparedQueryResult, std::string> _addFriendCallback;
         QueryCallback<PreparedQueryResult, uint32> _unstablePetCallback;

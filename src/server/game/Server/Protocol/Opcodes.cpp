@@ -108,7 +108,7 @@ void OpcodeTable::InitializeClientTable()
     DEFINE_OPCODE_HANDLER(CMSG_BATTLEMASTER_JOIN_ARENA,                   0x02D2, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBattlemasterJoinArena        ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BEGIN_TRADE,                               0x1CE3, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBeginTradeOpcode             ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BINDER_ACTIVATE,                           0x1248, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBinderActivateOpcode         ); // 5.4.8 18414
-    DEFINE_OPCODE_HANDLER(CMSG_BLACKMARKET_BID,                           0x12C8, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBlackMarketBidOnItem         ); // 5.4.8 18414
+    DEFINE_OPCODE_HANDLER(CMSG_BLACKMARKET_BID,                           0x12C8, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBlackMarketBidOpcode         ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BLACKMARKET_HELLO,                         0x075A, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBlackMarketHelloOpcode       ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BLACKMARKET_REQUEST_ITEMS,                 0x127A, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBlackMarketRequestItemOpcode ); // 5.4.8 18414
     DEFINE_OPCODE_HANDLER(CMSG_BUY_BANK_SLOT,                             0x12F2, STATUS_LOGGEDIN,  PROCESS_THREADUNSAFE, &WorldSession::HandleBuyBankSlotOpcode            ); // 5.4.8 18414

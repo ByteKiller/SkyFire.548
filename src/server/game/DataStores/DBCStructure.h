@@ -791,14 +791,14 @@ struct ChrSpecializationEntry
     uint32  Id;                                             // 0
     //char* unkName;                                        // 1
     uint32 classId;                                         // 2
-    uint32 MasterySpellId;                                  // 3
-    // uint32 unk                                           // 4 - prolly MasterySpellId[1] - always 0
+    uint32 specializationSpell;                             // 3
+    // uint32 masterySpellID                                // 4 - prolly MasterySpellId[1] - always 0
     uint32 TabPage;                                         // 5
     uint32 PetTabPage;                                      // 6
     uint32 RoleMask;                                        // 7
-    // uint32 iconId                                        // 8
-    // uint32 unk1                                          // 9
-    // uint32 unk2                                          // 10
+    // uint32 spellIconID                                   // 8
+    // uint32 raidBuffs                                     // 9
+    // uint32 flags                                         // 10
     // char* name                                           // 11
     // char* definition                                     // 12
     // char* unkName2                                       // 13
@@ -1960,6 +1960,45 @@ struct RandomPropertiesPointsEntry
     uint32    UncommonPropertiesPoints[5];                  // 12-16
 };
 
+struct ResearchBranchEntry
+{
+    uint32 Id;                                            // 0
+    //char* BranchName;                                   // 1
+    //uint32 ResearchFieldId;                             // 2 research field (from ResearchField.dbc)
+    //uint32 FragmentCurrencyId;                          // 3
+    //char* Icon;                                         // 4
+    //uint32 KeystoneItemId;                              // 5
+};
+
+//struct ResearchFieldEntry
+//{
+//    uint32 Id;                                            // 0
+//    char* FieldName;                                      // 1
+//    uint32 slot;                                          // 2
+//};
+
+struct ResearchProjectEntry
+{
+    uint32 Id;                                              // 0
+    //char* ProjectName;                                    // 1
+    //char* ProjectDescription;                             // 2
+    uint32 Rarity;                                          // 3 0-common, 1-rare
+    uint32 ResearchBranchId;                                // 4 branch id (from ResearchBranch.dbc)
+    //uint32 SpellId;                                       // 5
+    //uint32 KeystoneCount;                                 // 6
+    //char* ProjectIcon;                                    // 7
+    uint32 RequiredFragmentCount;                           // 8
+};
+
+struct ResearchSiteEntry
+{
+    uint32 Id;                                              // 0
+    uint32 MapId;                                           // 1
+    uint32 QuestPOIBlobId;                                  // 2 blob id (from QuestPOIBlob.dbc)
+    //char* SiteName;                                       // 3
+    //uint32 IconId;                                        // 4
+};
+
 struct ScalingStatDistributionEntry
 {
     uint32  Id;                                             // 0
@@ -1992,22 +2031,25 @@ struct ScalingStatValuesEntry
 //    uint32    displayOrder;                               // 19     m_sortIndex
 //};
 
-//struct SkillRaceClassInfoEntry{
-//    uint32    id;                                         // 0      m_ID
-//    uint32    skillId;                                    // 1      m_skillID
-//    uint32    raceMask;                                   // 2      m_raceMask
-//    uint32    classMask;                                  // 3      m_classMask
-//    uint32    flags;                                      // 4      m_flags
-//    uint32    reqLevel;                                   // 5      m_minLevel
-//    uint32    skillTierId;                                // 6      m_skillTierID
-//    uint32    skillCostID;                                // 7      m_skillCostIndex
-//};
+struct SkillRaceClassInfoEntry
+{
+    //uint32    ID;                                         // 0
+    uint32      SkillID;                                    // 1
+    int32       RaceMask;                                   // 2
+    int32       ClassMask;                                  // 3
+    uint32      Flags;                                      // 4
+    uint32      Availability;                               // 5
+    uint32      MinLevel;                                   // 6
+    uint32      SkillTierID;                                // 7
+};
 
-//struct SkillTiersEntry{
-//    uint32    id;                                         // 0      m_ID
-//    uint32    skillValue[16];                             // 1-17   m_cost
-//    uint32    maxSkillValue[16];                          // 18-32  m_valueMax
-//};
+#define MAX_SKILL_STEP 16
+
+struct SkillTiersEntry
+{
+    uint32      ID;                                         // 0
+    uint32      Value[MAX_SKILL_STEP];                      // 1-16
+};
 
 struct SkillLineEntry
 {
@@ -2025,17 +2067,19 @@ struct SkillLineEntry
 
 struct SkillLineAbilityEntry
 {
-    uint32    id;                                           // 0        m_ID
-    uint32    skillId;                                      // 1        m_skillLine
-    uint32    spellId;                                      // 2        m_spell
-    uint32    racemask;                                     // 3        m_raceMask
-    uint32    classmask;                                    // 4        m_classMask
-    uint32    req_skill_value;                              // 5        m_minSkillLineRank
-    uint32    forward_spellid;                              // 6        m_supercededBySpell
-    uint32    learnOnGetSkill;                              // 7        m_acquireMethod
-    uint32    max_value;                                    // 8        m_trivialSkillLineRankHigh
-    uint32    min_value;                                    // 9        m_trivialSkillLineRankLow
-    uint32    character_points;                             // 10       m_characterPoints - Pandaria - No longer an array
+    uint32      ID;                                         // 0
+    uint32      SkillLine;                                  // 1
+    uint32      SpellID;                                    // 2
+    uint32      RaceMask;                                   // 3
+    uint32      ClassMask;                                  // 4
+    uint32      MinSkillLineRank;                           // 5
+    uint32      SupercedesSpell;                            // 6
+    uint32      AquireMethod;                               // 7
+    uint32      TrivialSkillLineRankHigh;                   // 8
+    uint32      TrivialSkillLineRankLow;                    // 9
+    uint32      NumSkillUps;                                // 10
+    //uint32    UniqueBit;                                  // 11
+    //uint32    TradeSkillCategoryID;                       // 12
 };
 
 struct SoundEntriesEntry
@@ -2070,14 +2114,14 @@ struct SpecializationSpellsEntry
 struct SpellEffectEntry
 {
     uint32    Id;                                           // 0         m_ID
-    //uint32    Unk0;                                       // 1         unk - Pandaria
+    uint32    EffectDifficulty;                             // 1         m_effectDifficulty
     uint32    Effect;                                       // 2         m_effect
-    float     EffectValueMultiplier;                        // 3         m_effectValueMultiplier
+    float     EffectValueMultiplier;                        // 3         m_effectAmplitude
     uint32    EffectApplyAuraName;                          // 4         m_effectAura
-    uint32    EffectAuraTickCount;                          // 5         m_effectAuraTickCount
+    uint32    EffectAmplitude;                              // 5         m_effectAuraPeriod
     int32     EffectBasePoints;                             // 6         m_effectBasePoints (don't must be used in spell/auras explicitly, must be used cached Spell::m_currentBasePoints)
-    float     EffectBonusMultiplier;                        // 7         m_effectBonusMultiplier
-    float     EffectDamageMultiplier;                       // 8         m_effectDamageMultiplier
+    float     EffectSpellPowerCoeff;                        // 7         m_effectSpellpowerCoeff
+    float     EffectDamageMultiplier;                       // 8         m_effectChainAmplitude
     uint32    EffectChainTarget;                            // 9         m_effectChainTargets
     int32     EffectDieSides;                               // 10         m_effectDieSides
     uint32    EffectItemType;                               // 11        m_effectItemType
@@ -2090,12 +2134,12 @@ struct SpellEffectEntry
     float     EffectRealPointsPerLevel;                     // 18        m_effectRealPointsPerLevel
     flag128   EffectSpellClassMask;                         // 19 20 21 22 m_effectSpellClassMask1(2/3), effect 0
     uint32    EffectTriggerSpell;                           // 23        m_effectTriggerSpell
-    //uint32  Unk0                                          // 24        unk - Pandaria
+    float     EffectPosFacing;                              // 24
     uint32    EffectImplicitTargetA;                        // 25        m_implicitTargetA
     uint32    EffectImplicitTargetB;                        // 26        m_implicitTargetB
     uint32    EffectSpellId;                                // 27        new 4.0.0
     uint32    EffectIndex;                                  // 28        new 4.0.0
-    //uint32  Unk0                                          // 29        4.2.0 only 0 or 1
+    uint32    EffectAttributes;                             // 29
 };
 
 #define MAX_SPELL_EFFECTS 32

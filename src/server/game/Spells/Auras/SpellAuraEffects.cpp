@@ -542,14 +542,9 @@ void AuraEffect::GetApplicationList(std::list<AuraApplication*> & applicationLis
 
 int32 AuraEffect::CalculateAmount(Unit* caster)
 {
+    int32 amount;
     // default amount calculation
-    int32 amount = 0;
-    float m_BonusMultiplier = GetSpellInfo()->Effects[GetEffIndex()].CalcBonusMultiplier(caster);
-
-    if (!(m_spellInfo->AttributesEx8 & SPELL_ATTR8_MASTERY_SPECIALIZATION) || G3D::fuzzyEq(m_BonusMultiplier, 0.0f))
-        amount = m_spellInfo->Effects[m_effIndex].CalcValue(caster, &m_baseAmount, GetBase()->GetOwner()->ToUnit());
-    else if (caster && caster->GetTypeId() == TYPEID_PLAYER)
-        amount = int32(caster->GetFloatValue(PLAYER_FIELD_MASTERY) * m_BonusMultiplier);
+    amount = m_spellInfo->Effects[m_effIndex].CalcValue(caster, &m_baseAmount, GetBase()->GetOwner()->ToUnit());
 
     // check item enchant aura cast
     if (!amount && caster)
@@ -568,10 +563,10 @@ int32 AuraEffect::CalculateAmount(Unit* caster)
                                 {
                                     for (int t = 0; t < MAX_ITEM_ENCHANTMENT_EFFECTS; t++)
                                         if (pEnchant->spellid[t] == m_spellInfo->Id)
-                                    {
-                                        amount = uint32((item_rand_suffix->prefix[k]*castItem->GetItemSuffixFactor()) / 10000);
-                                        break;
-                                    }
+                                        {
+                                            amount = uint32((item_rand_suffix->prefix[k] * castItem->GetItemSuffixFactor()) / 10000);
+                                            break;
+                                        }
                                 }
 
                                 if (amount)
@@ -580,92 +575,656 @@ int32 AuraEffect::CalculateAmount(Unit* caster)
                         }
                     }
 
+    float DoneActualBenefit = 0.0f;
+
     // custom amount calculations go here
     switch (GetAuraType())
     {
         // crowd control auras
-        case SPELL_AURA_MOD_CONFUSE:
-        case SPELL_AURA_MOD_FEAR:
-        case SPELL_AURA_MOD_STUN:
-        case SPELL_AURA_MOD_ROOT:
-        case SPELL_AURA_TRANSFORM:
-            m_canBeRecalculated = false;
-            if (!m_spellInfo->ProcFlags)
-                break;
+    case SPELL_AURA_MOD_FEAR:
+    case SPELL_AURA_MOD_STUN:
+    case SPELL_AURA_MOD_ROOT:
+    case SPELL_AURA_TRANSFORM:
+    //case SPELL_AURA_MOD_FEAR_2:
+    {
+        m_canBeRecalculated = false;
+        bool customAmount = false;
+
+        // Custom entries
+        switch (GetSpellInfo()->Id)
+        {
+        case 3355:  // Freezing Trap
+        {
+            amount = 1;
+            customAmount = true;
+            break;
+        }
+        case 128405:// Narrow Escape
+        {
             amount = int32(GetBase()->GetUnitOwner()->CountPctFromMaxHealth(10));
-            if (caster)
+            customAmount = true;
+            break;
+        }
+        default:
+            break;
+        }
+
+        if (customAmount)
+            break;
+        if (!m_spellInfo->ProcFlags)
+            break;
+
+        amount = int32(GetBase()->GetUnitOwner()->CountPctFromMaxHealth(10));
+        if (caster)
+        {
+            // Glyphs increasing damage cap
+            Unit::AuraEffectList const& overrideClassScripts = caster->GetAuraEffectsByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
+            for (Unit::AuraEffectList::const_iterator itr = overrideClassScripts.begin(); itr != overrideClassScripts.end(); ++itr)
             {
-                // Glyphs increasing damage cap
-                Unit::AuraEffectList const& overrideClassScripts = caster->GetAuraEffectsByType(SPELL_AURA_OVERRIDE_CLASS_SCRIPTS);
-                for (Unit::AuraEffectList::const_iterator itr = overrideClassScripts.begin(); itr != overrideClassScripts.end(); ++itr)
+                if ((*itr)->IsAffectingSpell(m_spellInfo))
                 {
-                    if ((*itr)->IsAffectingSpell(m_spellInfo))
+                    // Glyph of Frost nova and similar auras
+                    if ((*itr)->GetMiscValue() == 7801)
                     {
-                        // Glyph of Frost nova and similar auras
-                        if ((*itr)->GetMiscValue() == 7801)
-                        {
-                            AddPct(amount, (*itr)->GetAmount());
-                            break;
-                        }
+                        AddPct(amount, (*itr)->GetAmount());
+                        break;
+                    }
+                }
+            }
+        }
+        break;
+    }
+    // Any damage breaks confusion
+    case SPELL_AURA_MOD_CONFUSE:
+        amount = 1;
+        break;
+    case SPELL_AURA_SCHOOL_ABSORB:
+        m_canBeRecalculated = false;
+        if (!caster)
+            break;
+        switch (GetSpellInfo()->SpellFamilyName)
+        {
+        case SPELLFAMILY_MONK:
+            // Life Cocoon
+            if (GetSpellInfo()->Id == 116849)
+            {
+                // +550% from sp bonus
+                DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 5.50f;
+            }
+            break;
+        case SPELLFAMILY_MAGE:
+            // Ice Barrier
+            if (GetSpellInfo()->Id == 11426)
+            {
+                // +440% from sp bonus
+                DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 4.40f;
+            }
+            // Mage Ward
+            else if (GetSpellInfo()->SpellFamilyFlags[0] & 0x8 && GetSpellInfo()->SpellFamilyFlags[2] & 0x8)
+            {
+                // +80.68% from sp bonus
+                DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 0.8068f;
+            }
+            break;
+        case SPELLFAMILY_WARLOCK:
+            // Twilight Ward
+            if (m_spellInfo->Id == 6229 || m_spellInfo->Id == 104048 || m_spellInfo->Id == 131623 || m_spellInfo->Id == 131624)
+            {
+                // +300% from sp bonus
+                DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 3.0f;
+            }
+            break;
+        case SPELLFAMILY_PRIEST:
+            // Power Word : Shield
+            if (GetSpellInfo()->Id == 17 || GetSpellInfo()->Id == 123258)
+            {
+                if (Player* _plr = caster->ToPlayer())
+                {
+                    switch (_plr->GetSpecializationId(_plr->GetActiveSpec()))
+                    {
+                    case SPEC_PRIEST_DISCIPLINE:
+                        // +263.8% from sp bonus
+                        DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 2.638f;
+                        break;
+                    case SPEC_PRIEST_HOLY:
+                        // +233.9% from sp bonus
+                        DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 2.339f;
+                        break;
+                    case SPEC_PRIEST_SHADOW:
+                        // +187.1% from sp bonus
+                        DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 1.871f;
+                        break;
+                    default:
+                        break;
                     }
                 }
             }
             break;
-        case SPELL_AURA_SCHOOL_ABSORB:
-        case SPELL_AURA_MANA_SHIELD:
-            m_canBeRecalculated = false;
+        default:
             break;
-        case SPELL_AURA_MOUNTED:
-            if (MountCapabilityEntry const* mountCapability = GetBase()->GetUnitOwner()->GetMountCapability(uint32(GetMiscValueB())))
-            {
-                amount = mountCapability->Id;
-                m_canBeRecalculated = false;
-            }
+        }
+        break;
+    case SPELL_AURA_MANA_SHIELD:
+        m_canBeRecalculated = false;
+        if (!caster)
             break;
-        case SPELL_AURA_MOD_RESISTANCE_EXCLUSIVE:
+        // Mana Shield
+        if (GetSpellInfo()->SpellFamilyName == SPELLFAMILY_MAGE && GetSpellInfo()->SpellFamilyFlags[0] & 0x8000 && m_spellInfo->SpellFamilyFlags[2] & 0x8)
         {
-            if (caster)
+            // +80.7% from +spd bonus
+            DoneActualBenefit += caster->SpellBaseDamageBonusDone(m_spellInfo->GetSchoolMask()) * 0.807f;
+        }
+        break;
+    case SPELL_AURA_DUMMY:
+        if (!caster)
+            break;
+        // Earth Shield
+        if (GetSpellInfo()->SpellFamilyName == SPELLFAMILY_SHAMAN && m_spellInfo->SpellFamilyFlags[1] & 0x400)
+        {
+            amount = caster->SpellHealingBonusDone(GetBase()->GetUnitOwner(), GetSpellInfo(), amount, SPELL_DIRECT_DAMAGE, NULL);
+            amount = GetBase()->GetUnitOwner()->SpellHealingBonusTaken(caster, GetSpellInfo(), amount, SPELL_DIRECT_DAMAGE, NULL);
+        }
+        break;
+    case SPELL_AURA_PERIODIC_DAMAGE:
+        if (!caster)
+            break;
+        // Rupture
+        if (GetSpellInfo()->Id == 1943)
+        {
+            m_canBeRecalculated = false;
+
+            if (caster->GetTypeId() != TYPEID_PLAYER)
+                break;
+
+            uint8 cp = caster->ToPlayer()->GetComboPoints();
+            float ap = caster->GetTotalAttackPowerValue(BASE_ATTACK);
+
+            switch (cp)
             {
-                // if Level <= 70 resist = player level
-                int32 resist = caster->getLevel();
-
-                if (resist > 70 && resist < 81)
-                    resist += (resist - 70) * 5;
-                else if (resist > 80)
-                    resist += ((resist-70) * 5 + (resist - 80) * 7);
-
-                switch (GetId())
-                {
-                    case 20043: // Aspect of the Wild
-                    case 8185:  // Elemental Resistance
-                    case 19891: // Resistance Aura
-                    case 79106: // Shadow Protection
-                    case 79107: // Shadow Protection
-                        amount = resist;
-                        break;
-                    case 79060: // Mark of the Wild
-                    case 79061: // Mark of the Wild
-                    case 79062: // Blessing of Kings
-                    case 79063: // Blessing of Kings
-                    case 90363: // Embrace of the Shale Spider
-                        amount = resist / 2;
-                        break;
-                }
+            case 1:
+                amount += int32(ap * 0.1f / 4);
+                break;
+            case 2:
+                amount += int32(ap * 0.24f / 6);
+                break;
+            case 3:
+                amount += int32(ap * 0.40f / 8);
+                break;
+            case 4:
+                amount += int32(ap * 0.56f / 10);
+                break;
+            case 5:
+                amount += int32(ap * 0.744f / 12);
+                break;
+            default:
                 break;
             }
         }
+        // Rip
+        if (m_spellInfo->Id == 1079)
+        {
+            m_canBeRecalculated = false;
+
+            if (caster->GetTypeId() != TYPEID_PLAYER)
+                break;
+
+            // Basepoint hotfix
+            amount *= 10;
+
+            uint8 cp = caster->ToPlayer()->GetComboPoints();
+            int32 AP = caster->GetTotalAttackPowerValue(BASE_ATTACK);
+
+            // In feral spec : 0.484 * $AP * cp
+            if (caster->ToPlayer()->GetSpecializationId(caster->ToPlayer()->GetActiveSpec()) == SPEC_DRUID_FERAL)
+                amount += int32(cp * AP * 0.484f);
+            // In other spec : 0.387 * $AP * cp
+            else
+                amount += int32(cp * AP * 0.387f);
+
+            // Idol of Feral Shadows. Cant be handled as SpellMod in SpellAura:Dummy due its dependency from CPs
+            if (AuraEffect const* aurEff = caster->GetAuraEffect(34241, EFFECT_0))
+                amount += cp * aurEff->GetAmount();
+            // Idol of Worship. Cant be handled as SpellMod in SpellAura:Dummy due its dependency from CPs
+            else if (AuraEffect const* aurEff = caster->GetAuraEffect(60774, EFFECT_0))
+                amount += cp * aurEff->GetAmount();
+
+            // Line crashes server for some reason??
+            //amount /= int32(GetBase()->GetMaxDuration() / GetBase()->GetEffect(0)->GetAmplitude());
+        }
+        // Unholy Blight damage over time effect
+        else if (GetId() == 50536)
+        {
+            m_canBeRecalculated = false;
+            // we're getting total damage on aura apply, change it to be damage per tick
+            amount = int32((float)amount / GetTotalTicks());
+        }
+        break;
+    case SPELL_AURA_PERIODIC_ENERGIZE:
+    {
+        switch (m_spellInfo->Id)
+        {
+        case 5171:  // Slice and Dice
+        {
+            if (!caster)
+                break;
+
+            Player* plr = caster->ToPlayer();
+            if (!plr)
+                break;
+
+            if (!plr->HasAura(76808))
+                break;
+
+            float MasteryPCT = 1.0f + plr->GetFloatValue(PLAYER_FIELD_MASTERY) * 3.0f;
+            AddPct(amount, MasteryPCT);
+
+            break;
+        }
+        case 57669: // Replenishment (0.2% from max)
+            amount = CalculatePct(GetBase()->GetUnitOwner()->GetMaxPower(POWER_MANA), amount);
+            break;
+        case 61782: // Infinite Replenishment
+            amount = GetBase()->GetUnitOwner()->GetMaxPower(POWER_MANA) * 0.0025f;
+            break;
+        case 29166: // Innervate
+            ApplyPct(amount, float(GetBase()->GetUnitOwner()->GetCreatePowers(POWER_MANA)) / GetTotalTicks());
+            break;
+        case 48391: // Owlkin Frenzy
+            ApplyPct(amount, GetBase()->GetUnitOwner()->GetCreatePowers(POWER_MANA));
+            break;
         default:
             break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_PERIODIC_HEAL:
+    {
+        if (!caster)
+            break;
+
+        switch (GetId())
+        {
+        case 746:   // First Aid
+        case 1159:
+        case 3267:
+        case 3268:
+        case 7926:
+        case 7927:
+        case 10838:
+        case 10839:
+        case 18608:
+        case 18610:
+        case 27030:
+        case 27031:
+        case 45543:
+        case 45544:
+        case 51803:
+        case 51827:
+        case 72996:
+        case 74553:
+        case 74554:
+        case 74555:
+        case 102694:
+        case 102695:
+        {
+            // The Doctor Is In
+            if (Aura* doctorIsIn = caster->GetAura(118076))
+            {
+                if (caster->GetTypeId() != TYPEID_PLAYER)
+                    break;
+
+                Player* _plr = caster->ToPlayer();
+                if (_plr->GetMap()->IsBattlegroundOrArena())
+                    break;
+
+                AddPct(amount, doctorIsIn->GetEffect(0)->GetAmount());
+            }
+
+            break;
+        }
+        case 90361: // Spirit Mend
+        {
+            if (!caster->GetOwner())
+                break;
+
+            Player* m_owner = caster->GetOwner()->ToPlayer();
+            if (!m_owner)
+                break;
+
+            amount += int32(m_owner->GetTotalAttackPowerValue(RANGED_ATTACK) * 0.35f * 0.335f);
+
+            break;
+        }
+        case 114163:// Eternal Flame
+        {
+            amount += int32(0.0585f * caster->SpellBaseDamageBonusDone(SpellSchoolMask(m_spellInfo->SchoolMask)));
+
+            int32 holyPower = caster->GetPower(POWER_HOLY_POWER) + 1;
+
+            if (holyPower > 3)
+                holyPower = 3;
+
+            // Divine Purpose
+            if (caster->HasAura(90174))
+                holyPower = 3;
+
+            amount *= holyPower;
+
+            caster->ModifyPower(POWER_HOLY_POWER, (holyPower > 1) ? (-(holyPower - 1)) : 0);
+
+            // Item - Paladin PvP Set Holy 4P Bonus
+            if (caster->HasAura(131665) && holyPower == 3)
+                caster->ModifyPower(POWER_HOLY_POWER, 1);
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_THREAT:
+    {
+        uint8 level_diff = 0;
+        float multiplier = 0.0f;
+        switch (GetId())
+        {
+            // Arcane Shroud
+        case 26400:
+            level_diff = GetBase()->GetUnitOwner()->getLevel() - 60;
+            multiplier = 2;
+            break;
+            // The Eye of Diminution
+        case 28862:
+            level_diff = GetBase()->GetUnitOwner()->getLevel() - 60;
+            multiplier = 1;
+            break;
+        }
+        if (level_diff > 0)
+            amount += int32(multiplier * level_diff);
+        break;
+    }
+    case SPELL_AURA_MOD_INCREASE_HEALTH:
+        // Vampiric Blood
+        if (GetId() == 55233)
+            amount = GetBase()->GetUnitOwner()->CountPctFromMaxHealth(amount);
+        break;
+    case SPELL_AURA_MOD_INCREASE_SPEED:
+        // Dash - do not set speed if not in cat form
+        if (GetSpellInfo()->SpellFamilyName == SPELLFAMILY_DRUID && GetSpellInfo()->SpellFamilyFlags[2] & 0x00000008)
+            amount = GetBase()->GetUnitOwner()->GetShapeshiftForm() == FORM_CAT ? amount : 0;
+
+        if (GetSpellInfo()->Id == 101546) // Spinning Crane Kick
+        {
+            if (Unit* caster = GetCaster())
+            {
+                if (caster->HasAura(120479)) // Glyph of Spinning Crane Kick
+                    amount = 170;
+                break;
+            }
+        }
+
+        break;
+    case SPELL_AURA_MOUNTED:
+        if (MountCapabilityEntry const* mountCapability = GetBase()->GetUnitOwner()->GetMountCapability(uint32(GetMiscValueB())))
+        {
+            amount = mountCapability->Id;
+            m_canBeRecalculated = false;
+        }
+        break;
+
+    case SPELL_AURA_MOD_RESISTANCE_EXCLUSIVE:
+    {
+        if (caster)
+        {
+            // if Level <= 70 resist = player level
+            int32 resist = caster->getLevel();
+
+            if (resist > 70 && resist < 81)
+                resist += (resist - 70) * 5;
+            else if (resist > 80)
+                resist += ((resist - 70) * 5 + (resist - 80) * 7);
+
+            switch (GetId())
+            {
+            case 20043: // Aspect of the Wild
+            case 8185:  // Elemental Resistance
+            case 19891: // Resistance Aura
+            case 79106: // Shadow Protection
+            case 79107: // Shadow Protection
+                amount = resist;
+                break;
+            case 79060: // Mark of the Wild
+            case 79061: // Mark of the Wild
+            case 79062: // Blessing of Kings
+            case 79063: // Blessing of Kings
+            case 90363: // Embrace of the Shale Spider
+                amount = resist / 2;
+                break;
+            }
+            break;
+        }
+    }
+    case SPELL_AURA_BYPASS_ARMOR_FOR_CASTER:
+    {
+        switch (GetId())
+        {
+        case 86346: // Colossus Smash
+            if (GetBase()->GetUnitOwner()->GetTypeId() == TYPEID_PLAYER)
+                amount /= 2;
+            break;
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_INCREASE_HEALTH_PERCENT:
+    {
+        switch (GetId())
+        {
+        case 120954:// Fortifying Brew
+        {
+            // Glyph of Fortifying Brew
+            if (caster->HasAura(124997))
+                amount = 10;
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_DAMAGE_PERCENT_TAKEN:
+    {
+        switch (GetId())
+        {
+        case 120954:// Fortifying Brew
+        {
+            // Glyph of Fortifying Brew
+            if (caster->HasAura(124997))
+                amount = 25;
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_OBS_MOD_HEALTH:
+    {
+        switch (GetId())
+        {
+        case 6262:  // Healthstone
+            if (!caster->HasAura(56224)) // Glyph of Healthstone
+                amount = 0;
+            break;
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_DECREASE_SPEED:
+    {
+        switch (GetId())
+        {
+        case 73682: // Unleash Frost
+        {
+            if (Unit* target = GetBase()->GetUnitOwner())
+            {
+                Unit::AuraEffectList const& auras = target->GetAuraEffectsByType(SPELL_AURA_MOD_DECREASE_SPEED);
+                for (Unit::AuraEffectList::const_iterator itr = auras.begin(); itr != auras.end(); ++itr)
+                {
+                    if (GetId() != (*itr)->GetSpellInfo()->Id && (*itr)->GetSpellInfo()->GetSchoolMask() == SPELL_SCHOOL_MASK_FROST)
+                    {
+                        amount = 70;
+                        break;
+                    }
+                }
+            }
+
+            break;
+        }
+        case 5215:  // Prowl
+        case 102547:// Prowl (overrided)
+        {
+            // Glyph of Prowl, remove the speed malus
+            if (Unit* target = GetBase()->GetUnitOwner())
+                if (target->HasAura(116186))
+                    amount = 0;
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_MELEE_HASTE_3:
+    {
+        switch (GetId())
+        {
+        case 5171:  // Slice and Dice
+        {
+            if (!caster)
+                break;
+
+            Player* plr = caster->ToPlayer();
+            if (!plr)
+                break;
+
+            if (!plr->HasAura(76808))
+                break;
+
+            float MasteryPCT = 1.0f + plr->GetFloatValue(PLAYER_FIELD_MASTERY) * 3.0f;
+            AddPct(amount, MasteryPCT);
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_PARRY_PERCENT:
+    {
+        switch (GetId())
+        {
+        case 113656:// Fists of Fury
+        {
+            if (caster)
+                if (caster->HasAura(125671))
+                    amount = 100;
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    case SPELL_AURA_MOD_INCREASE_SWIM_SPEED:
+    {
+        switch (GetId())
+        {
+        case 86496: // Mount Speed Mod: Walking Speed Ground Mount
+        {
+            if (!caster)
+                break;
+
+            if (uint32 mapId = caster->GetZoneId())
+            {
+                // Vashj'Ir
+                if (mapId == 4815 || mapId == 5144 || mapId == 5145 || mapId == 5146)
+                    amount = 300;
+                else
+                    break;
+            }
+
+            break;
+        }
+        default:
+            break;
+        }
+
+        break;
+    }
+    default:
+        break;
+
+    }
+    if (DoneActualBenefit != 0.0f)
+    {
+        DoneActualBenefit *= caster->CalculateLevelPenalty(GetSpellInfo());
+        amount += (int32)DoneActualBenefit;
     }
 
     GetBase()->CallScriptEffectCalcAmountHandlers(this, amount, m_canBeRecalculated);
     amount *= GetBase()->GetStackAmount();
+
+    // Fixate damage for periodic damage auras
+    // It's only for players now
+    if (caster && caster->GetTypeId() == TYPEID_PLAYER)
+    {
+        if (GetAuraType() == SPELL_AURA_PERIODIC_DAMAGE)
+        {
+            if (GetBase()->GetType() == UNIT_AURA_TYPE)
+            {
+                Unit* target = GetBase()->GetUnitOwner();
+                int32 temp_damage = amount;
+                float temp_crit = 0.0f;
+
+                temp_damage = caster->SpellDamageBonusDone(target, GetSpellInfo(), temp_damage, DOT, GetBase()->GetStackAmount());
+                temp_crit = caster->isSpellCrit(target, GetSpellInfo(), SpellSchoolMask(GetSpellInfo()->SchoolMask));
+
+                m_fixed_periodic.SetFixedDamage(temp_damage);
+                m_fixed_periodic.SetCriticalChance(temp_crit);
+
+                // Seed of Corruption and Soulburn : Seed of corruption - Set Total damage for explode
+                if (GetSpellInfo()->Id == 27243 || GetSpellInfo()->Id == 114790)
+                    m_fixed_periodic.SetFixedTotalDamage(temp_damage * (GetBase()->GetMaxDuration() / GetAmplitude()));
+
+                hasFixedPeriodic = true;
+                amount = temp_damage;
+            }
+        }
+    }
+
     return amount;
 }
 
 void AuraEffect::CalculatePeriodic(Unit* caster, bool resetPeriodicTimer /*= true*/, bool load /*= false*/)
 {
-    m_amplitude = m_spellInfo->Effects[m_effIndex].ApplyAuraTickCount;
+    m_amplitude = m_spellInfo->Effects[m_effIndex].Amplitude;
 
     // prepare periodics
     switch (GetAuraType())
@@ -1200,7 +1759,7 @@ void AuraEffect::CleanupTriggeredSpells(Unit* target)
     // needed for spell 43680, maybe others
     /// @todo is there a spell flag, which can solve this in a more sophisticated way?
     if (m_spellInfo->Effects[GetEffIndex()].ApplyAuraName == SPELL_AURA_PERIODIC_TRIGGER_SPELL &&
-        uint32(m_spellInfo->GetDuration()) == m_spellInfo->Effects[GetEffIndex()].ApplyAuraTickCount)
+        uint32(m_spellInfo->GetDuration()) == m_spellInfo->Effects[GetEffIndex()].Amplitude)
         return;
 
     target->RemoveAurasDueToSpell(tSpellId, GetCasterGUID());

@@ -30,6 +30,7 @@
 #include "QuestDef.h"
 #include "SpellMgr.h"
 #include "Unit.h"
+#include "ObjectMgr.h"
 #include "Opcodes.h"
 #include "WorldSession.h"
 
@@ -390,7 +391,7 @@ typedef std::list<PlayerCreateInfoItem> PlayerCreateInfoItems;
 
 struct PlayerLevelInfo
 {
-    PlayerLevelInfo() { for (uint8 i=0; i < MAX_STATS; ++i) stats[i] = 0; }
+    PlayerLevelInfo() { for (uint8 i = 0; i < MAX_STATS; ++i) stats[i] = 0; }
 
     uint8 stats[MAX_STATS];
 };
@@ -409,6 +410,8 @@ struct PlayerCreateInfoAction
 
 typedef std::list<PlayerCreateInfoAction> PlayerCreateInfoActions;
 
+typedef std::list<SkillRaceClassInfoEntry const*> PlayerCreateInfoSkills;
+
 struct PlayerInfo
 {
                                                             // existence checked by displayId != 0
@@ -423,8 +426,9 @@ struct PlayerInfo
     uint16 displayId_m;
     uint16 displayId_f;
     PlayerCreateInfoItems item;
-    PlayerCreateInfoSpells spell;
+    PlayerCreateInfoSpells customSpells;
     PlayerCreateInfoActions action;
+    PlayerCreateInfoSkills skills;
 
     PlayerLevelInfo* levelInfo;                             //[level-1] 0..MaxPlayerLevel-1
 };
@@ -697,7 +701,7 @@ enum EquipmentSlots                                         // 19 slots
     EQUIPMENT_SLOT_BACK         = 14,
     EQUIPMENT_SLOT_MAINHAND     = 15,
     EQUIPMENT_SLOT_OFFHAND      = 16,
-    //EQUIPMENT_SLOT_RANGED       = 17,
+    EQUIPMENT_SLOT_RANGED       = 17,
     EQUIPMENT_SLOT_TABARD       = 18,
     EQUIPMENT_SLOT_END          = 19
 };
@@ -912,6 +916,9 @@ enum PlayerLoginQueryIndex
     PLAYER_LOGIN_QUERY_LOAD_BATTLE_PETS             = 36,
     PLAYER_LOGIN_QUERY_LOAD_BATTLE_PET_SLOTS        = 37,
     PLAYER_LOGIN_QUERY_LOAD_QUEST_OBJECTIVE_STATUS  = 38,
+    PLAYER_LOGIN_QUERY_LOAD_RESEARCH_DIGSITES       = 39,
+    PLAYER_LOGIN_QUERY_LOAD_RESEARCH_HISTORY        = 40,
+    PLAYER_LOGIN_QUERY_LOAD_RESEARCH_PROJECTS       = 41,
     MAX_PLAYER_LOGIN_QUERY
 };
 
@@ -1196,14 +1203,17 @@ private:
 
 struct PlayerTalentInfo
 {
-    PlayerTalentInfo() : UsedTalentCount(0), ResetTalentsCost(0), ResetTalentsTime(0), 
-        ResetSpecializationCost(0), ActiveSpec(0), SpecsCount(1), ResetSpecializationTime(0)
+    PlayerTalentInfo() :
+        FreeTalentPoints(0), UsedTalentCount(0), ResetTalentsCost(0),
+        ResetSpecializationCost(0), ResetTalentsTime(0), ResetSpecializationTime(0),
+        ActiveSpec(0), SpecsCount(1)
     {
         for (uint8 i = 0; i < MAX_TALENT_SPECS; ++i)
         {
             SpecInfo[i].Talents = new PlayerTalentMap();
             memset(SpecInfo[i].Glyphs, 0, MAX_GLYPH_SLOT_INDEX * sizeof(uint32));
             SpecInfo[i].TalentTree = 0;
+            SpecInfo[i].SpecializationId = 0;
         }
     }
 
@@ -1225,6 +1235,7 @@ struct PlayerTalentInfo
         uint32 SpecializationId;
     } SpecInfo[MAX_TALENT_SPECS];
 
+    uint32 FreeTalentPoints;
     uint32 UsedTalentCount;
     uint32 ResetTalentsCost;
     time_t ResetTalentsTime;
@@ -1237,35 +1248,40 @@ private:
     PlayerTalentInfo(PlayerTalentInfo const&);
 };
 
-//const uint32 ResearchContinents[RESEARCH_CONTINENT_COUNT] = { 0, 1, 530, 571, 870}; // Eastern Kingdoms, Kalimdor, Outland, Northrend, Pandaria
-//
-//struct ResearchDigsite
-//{
-//    ResearchDigsite(ResearchDigsiteInfo const* digsiteInfo, uint8 remainingFindCount) : _digsiteInfo(digsiteInfo), _archaeologyFind(NULL), _remainingFindCount(remainingFindCount) { }
-//
-//    void SelectNewArchaeologyFind(bool onInit);
-//    void ChangeArchaeologyFind(ArchaeologyFindInfo const* find) { _archaeologyFind = find; }
-//    ArchaeologyFindInfo const* GetArchaeologyFind() { return _archaeologyFind; }
-//    bool IsEmptyDigsite() { return !_remainingFindCount; }
-//
-//    uint32 GetDigsiteId() { return _digsiteInfo->digsiteId; }
-//    ResearchDigsiteInfo const* GetDigsiteInfo() { return _digsiteInfo; }
-//    uint8 GetRemainingFindCount() { return _remainingFindCount; }
-//
-//private:
-//    ResearchDigsiteInfo const* _digsiteInfo;
-//    ArchaeologyFindInfo const* _archaeologyFind;
-//    uint8 _remainingFindCount;
-//};
-//
-//struct ResearchProjectHistory
-//{
-//    uint32 researchCount;
-//    uint32 firstResearchTimestamp;
-//};
-//
-//typedef UNORDERED_MAP<uint32 /*projectId*/, ResearchProjectHistory> ResearchHistoryMap;
-//typedef UNORDERED_MAP<uint32 /*branchId*/, uint32 /*projectId*/> ResearchProjectMap;
+#define RESEARCH_CONTINENT_COUNT    5
+#define RESEARCH_BRANCH_COUNT       10
+#define MAX_DIGSITES_PER_CONTINENT  4
+#define MAX_FINDS_PER_DIGSITE       6
+
+const uint32 ResearchContinents[RESEARCH_CONTINENT_COUNT] = { 0, 1, 530, 571, 870}; // Eastern Kingdoms, Kalimdor, Outland, Northrend, Pandaria
+
+struct ResearchDigsite
+{
+    ResearchDigsite(ResearchDigsiteInfo const* digsiteInfo, uint8 remainingFindCount) : _digsiteInfo(digsiteInfo), _archaeologyFind(NULL), _remainingFindCount(remainingFindCount) { }
+
+    void SelectNewArchaeologyFind(bool onInit);
+    void ChangeArchaeologyFind(ArchaeologyFindInfo const* find) { _archaeologyFind = find; }
+    ArchaeologyFindInfo const* GetArchaeologyFind() { return _archaeologyFind; }
+    bool IsEmptyDigsite() { return !_remainingFindCount; }
+
+    uint32 GetDigsiteId() { return _digsiteInfo->digsiteId; }
+    ResearchDigsiteInfo const* GetDigsiteInfo() { return _digsiteInfo; }
+    uint8 GetRemainingFindCount() { return _remainingFindCount; }
+
+private:
+    ResearchDigsiteInfo const* _digsiteInfo;
+    ArchaeologyFindInfo const* _archaeologyFind;
+    uint8 _remainingFindCount;
+};
+
+struct ResearchProjectHistory
+{
+    uint32 researchCount;
+    uint32 firstResearchTimestamp;
+};
+
+typedef UNORDERED_MAP<uint32 /*projectId*/, ResearchProjectHistory> ResearchHistoryMap;
+typedef UNORDERED_MAP<uint32 /*branchId*/, uint32 /*projectId*/> ResearchProjectMap;
 
 class Player : public Unit, public GridObject<Player>
 {
@@ -1301,7 +1317,7 @@ class Player : public Unit, public GridObject<Player>
 
         void Update(uint32 time);
 
-        static bool BuildEnumData(PreparedQueryResult result, ByteBuffer* dataBuffer, ByteBuffer* bitBuffer);
+        static bool BuildEnumData(PreparedQueryResult result, ByteBuffer* dataBuffer, ByteBuffer* bitBuffer, bool boosted = false);
 
         void SetInWater(bool apply);
 
@@ -1347,7 +1363,9 @@ class Player : public Unit, public GridObject<Player>
         void SetGMVisible(bool on);
         void SetPvPDeath(bool on) { if (on) m_ExtraFlags |= PLAYER_EXTRA_PVP_DEATH; else m_ExtraFlags &= ~PLAYER_EXTRA_PVP_DEATH; }
 
+        void XPGainAborted();
         void GiveXP(uint32 xp, Unit* victim, float group_rate=1.0f);
+        void GiveGatheringXP();
         void GiveLevel(uint8 level);
 
         void InitStatsForLevel(bool reapplyMods = false);
@@ -1698,7 +1716,7 @@ class Player : public Unit, public GridObject<Player>
         /***                   LOAD SYSTEM                     ***/
         /*********************************************************/
 
-        bool LoadFromDB(uint32 guid, SQLQueryHolder *holder);
+        bool LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult accountResult);
         bool isBeingLoaded() const;
 
         void Initialize(uint32 guid);
@@ -1817,7 +1835,11 @@ class Player : public Unit, public GridObject<Player>
         void learnSpell(uint32 spell_id, bool dependent);
         void removeSpell(uint32 spell_id, bool disabled = false, bool learn_low_rank = true);
         void resetSpells(bool myClassOnly = false);
+        void LearnCustomSpells();
         void learnDefaultSpells();
+        void LearnDefaultSkills();
+        void InitSpellForLevel();
+        void LearnDefaultSkill(SkillRaceClassInfoEntry const* rcInfo);
         void learnQuestRewardedSpells();
         void learnQuestRewardedSpells(Quest const* quest);
         void learnSpellHighRank(uint32 spellid);
@@ -1828,25 +1850,27 @@ class Player : public Unit, public GridObject<Player>
         std::string GetGuildName();
 
         // Talents
+        uint32 GetFreeTalentPoints() const { return _talentMgr->FreeTalentPoints; }
+        void SetFreeTalentPoints(uint32 points) { _talentMgr->FreeTalentPoints = points; }
         uint32 GetUsedTalentCount() const { return _talentMgr->UsedTalentCount; }
         void SetUsedTalentCount(uint32 talents) { _talentMgr->UsedTalentCount = talents; }
         uint32 GetTalentResetCost() const { return _talentMgr->ResetTalentsCost; }
-        void SetTalentResetCost(uint32 cost)  { _talentMgr->ResetTalentsCost = cost; }
         uint32 GetSpecializationResetCost() const { return _talentMgr->ResetSpecializationCost; }
         void SetSpecializationResetCost(uint32 cost) { _talentMgr->ResetSpecializationCost = cost; }
         uint32 GetSpecializationResetTime() const { return _talentMgr->ResetSpecializationTime; }
         void SetSpecializationResetTime(time_t time_) { _talentMgr->ResetSpecializationTime = time_; }
+        void SetTalentResetCost(uint32 cost)  { _talentMgr->ResetTalentsCost = cost; }
         uint32 GetTalentResetTime() const { return _talentMgr->ResetTalentsTime; }
         void SetTalentResetTime(time_t time_)  { _talentMgr->ResetTalentsTime = time_; }
-        uint32 GetTalentSpecialization(uint8 spec) const { return _talentMgr->SpecInfo[spec].TalentTree; }
-        void SetTalentSpecialization(uint8 spec, uint32 tree) { _talentMgr->SpecInfo[spec].TalentTree = tree; }
         uint8 GetActiveSpec() const { return _talentMgr->ActiveSpec; }
         void SetActiveSpec(uint8 spec){ _talentMgr->ActiveSpec = spec; }
         uint8 GetSpecsCount() const { return _talentMgr->SpecsCount; }
         void SetSpecsCount(uint8 count) { _talentMgr->SpecsCount = count; }
+        void SetSpecializationId(uint8 spec, uint32 id);
         uint32 GetSpecializationId(uint8 spec) const { return _talentMgr->SpecInfo[spec].SpecializationId; }
         uint32 GetRoleForGroup(uint32 specializationId);
         float GetMasterySpellCoefficient() const;
+
 
         bool ResetTalents(bool noCost = false, bool resetTalents = true, bool resetSpecialization = true);
         bool RemoveTalent(uint32 talentId);
@@ -1856,12 +1880,15 @@ class Player : public Unit, public GridObject<Player>
         void InitTalentForLevel();
         void BuildPlayerTalentsInfoData(WorldPacket* data);
         void BuildPetTalentsInfoData(WorldPacket* data);
-        void SendTalentsInfoData();
+        void SendTalentsInfoData(bool pet = false);
         bool LearnTalent(uint16 talentId);
         void LearnPetTalent(uint64 petGuid, uint32 talentId, uint32 talentRank);
         bool AddTalent(uint32 spellId, uint8 spec, bool learning);
         bool HasTalent(uint32 spell_id, uint8 spec) const;
         uint32 CalculateTalentsPoints() const;
+        void CastPassiveTalentSpell(uint32 spellId);
+        void RemovePassiveTalentSpell(uint32 spellId);
+        int32 CalculateMonkMeleeAttacks(float coeff, int32 APmultiplier);
 
         // Dual Spec
         void UpdateSpecCount(uint8 count);
@@ -2154,7 +2181,7 @@ class Player : public Unit, public GridObject<Player>
         int16 GetSkillTempBonusValue(uint32 skill) const;
         uint16 GetSkillStep(uint16 skill) const;            // 0...6
         bool HasSkill(uint32 skill) const;
-        void learnSkillRewardedSpells(uint32 id, uint32 value);
+        void LearnSkillRewardedSpells(uint32 id, uint32 value);
 
         WorldLocation& GetTeleportDest() { return m_teleport_dest; }
         bool IsBeingTeleported() const { return mSemaphoreTeleport_Near || mSemaphoreTeleport_Far; }
@@ -2170,6 +2197,7 @@ class Player : public Unit, public GridObject<Player>
         uint32 GetTeam() const { return m_team; }
         TeamId GetTeamId() const { return m_team == ALLIANCE ? TEAM_ALLIANCE : TEAM_HORDE; }
         void setFactionForRace(uint8 race);
+        void SendFeatureSystemStatus();
 
         void InitDisplayIds();
 
@@ -2653,6 +2681,34 @@ class Player : public Unit, public GridObject<Player>
 
         uint32 GetQuestObjectiveCounter(uint32 objectiveId) const;
 
+        // Archaeology
+        void SaveResearchDigsiteToDB(ResearchDigsite* digsite);
+        void DeleteResearchDigsite(ResearchDigsite* digsite);
+        void UpdateResearchDigsites();
+        bool IsWithinResearchDigsite(ResearchDigsite* digsite);
+        ResearchDigsite* GetCurrentResearchDigsite();
+        ResearchDigsite* TryToSpawnResearchDigsiteOnContinent(uint32 mapId);
+        ResearchDigsiteInfo const* GetRandomResearchDigsiteForContinent(uint32 mapId);
+        bool IsResearchDigsiteAvailable(ResearchDigsiteInfo const* digsiteInfo);
+        void SendResearchHistory();
+        void SolveResearchProject(Spell* spell);
+        bool HasCompletedResearchProject(uint32 projectId) { return _researchHistory.end() != _researchHistory.find(projectId); }
+        bool HasCompletedAllRareProjectsForRace(uint32 researchBranchId);
+        bool HasCompletedAllCommonProjectsForRace(uint32 researchBranchId, bool onlyAvailable);
+        uint32 GetRandomResearchProjectForRace(uint32 researchBranchId);
+        void UpdateResearchProjects();
+        void SendSurveryCastInfo(ResearchDigsite* digsite, bool success);
+
+        void SetKnockBackTime(uint32 timer) { m_knockBackTimer = timer; }
+        uint32 GetKnockBackTime() const { return m_knockBackTimer; }
+
+        // To silence achievement announcements
+        void SilenceAchievementAnnounce(bool silence) { m_isAchievementAnnounceSilenced = silence; }
+        bool IsAchievementAnnounceSilenced() const { return m_isAchievementAnnounceSilenced; }
+
+        uint64 greenGuid;
+        uint64 purpleGuid;
+
     protected:
         // Gamemaster whisper whitelist
         WhisperListContainer WhisperList;
@@ -2731,6 +2787,9 @@ class Player : public Unit, public GridObject<Player>
         void _LoadInstanceTimeRestrictions(PreparedQueryResult result);
         void _LoadCurrency(PreparedQueryResult result);
         void _LoadCUFProfiles(PreparedQueryResult result);
+        void _LoadResearchHistory(PreparedQueryResult result);
+        void _LoadResearchProjects(PreparedQueryResult result);
+        void _LoadResearchDigsites(PreparedQueryResult result);
 
         /*********************************************************/
         /***                   SAVE SYSTEM                     ***/
@@ -2748,7 +2807,7 @@ class Player : public Unit, public GridObject<Player>
         void _SaveMonthlyQuestStatus(SQLTransaction& trans);
         void _SaveSeasonalQuestStatus(SQLTransaction& trans);
         void _SaveSkills(SQLTransaction& trans);
-        void _SaveSpells(SQLTransaction& trans);
+        void _SaveSpells(SQLTransaction& charTrans, SQLTransaction& accountTrans);
         void _SaveEquipmentSets(SQLTransaction& trans);
         void _SaveBGData(SQLTransaction& trans);
         void _SaveGlyphs(SQLTransaction& trans);
@@ -2757,6 +2816,8 @@ class Player : public Unit, public GridObject<Player>
         void _SaveInstanceTimeRestrictions(SQLTransaction& trans);
         void _SaveCurrency(SQLTransaction& trans);
         void _SaveCUFProfiles(SQLTransaction& trans);
+        void _SaveResearchHistory(SQLTransaction& trans);
+        void _SaveResearchProjects(SQLTransaction& trans);
 
         /*********************************************************/
         /***              ENVIRONMENTAL SYSTEM                 ***/
@@ -2940,6 +3001,11 @@ class Player : public Unit, public GridObject<Player>
         // Guid of player who invited player to guild as last
         uint64 m_lastGuildInviterGUID;
 
+        // Archaeology
+        ResearchDigsite* _researchDigsites[RESEARCH_CONTINENT_COUNT][MAX_DIGSITES_PER_CONTINENT];
+        ResearchProjectMap _researchProjects;
+        ResearchHistoryMap _researchHistory;
+
     private:
         // internal common parts for CanStore/StoreItem functions
         InventoryResult CanStoreItem_InSpecificSlot(uint8 bag, uint8 slot, ItemPosCountVec& dest, ItemTemplate const* pProto, uint32& count, bool swap, Item* pSrcItem) const;
@@ -3012,6 +3078,10 @@ class Player : public Unit, public GridObject<Player>
         PhaseMgr phaseMgr;
 
         BattlePetMgr* m_battlePetMgr;
+
+        uint32 m_knockBackTimer;
+
+        bool m_isAchievementAnnounceSilenced;
 };
 
 void AddItemsSetItem(Player*player, Item* item);

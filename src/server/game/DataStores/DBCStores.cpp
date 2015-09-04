@@ -176,11 +176,20 @@ DBCStorage <QuestSortEntry> sQuestSortStore(QuestSortEntryfmt);
 DBCStorage <QuestXPEntry>   sQuestXPStore(QuestXPfmt);
 DBCStorage <QuestFactionRewEntry>  sQuestFactionRewardStore(QuestFactionRewardfmt);
 DBCStorage <RandomPropertiesPointsEntry> sRandomPropertiesPointsStore(RandomPropertiesPointsfmt);
+
+DBCStorage <ResearchBranchEntry>  sResearchBranchStore(ResearchBranchfmt);
+DBCStorage <ResearchProjectEntry> sResearchProjectStore(ResearchProjectfmt);
+DBCStorage <ResearchSiteEntry>    sResearchSiteStore(ResearchSitefmt);
+static DigsitePOIPolygonContainer sDigsitePOIPolygons;
+
 DBCStorage <ScalingStatDistributionEntry> sScalingStatDistributionStore(ScalingStatDistributionfmt);
 DBCStorage <ScalingStatValuesEntry> sScalingStatValuesStore(ScalingStatValuesfmt);
 
 DBCStorage <SkillLineEntry> sSkillLineStore(SkillLinefmt);
 DBCStorage <SkillLineAbilityEntry> sSkillLineAbilityStore(SkillLineAbilityfmt);
+DBCStorage <SkillRaceClassInfoEntry> sSkillRaceClassInfoStore(SkillRaceClassInfofmt);
+SkillRaceClassInfoMap SkillRaceClassInfoBySkill;
+DBCStorage <SkillTiersEntry> sSkillTiersStore(SkillTiersfmt);
 
 DBCStorage <SoundEntriesEntry> sSoundEntriesStore(SoundEntriesfmt);
 
@@ -595,10 +604,10 @@ void LoadDBCStores(const std::string& dataPath)
         if (!skillAbility)
             continue;
 
-        if (skillAbility->learnOnGetSkill != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
+        if (skillAbility->AquireMethod != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
             continue;
 
-        SpellEntry const* spellInfo = sSpellStore.LookupEntry(skillAbility->spellId);
+        SpellEntry const* spellInfo = sSpellStore.LookupEntry(skillAbility->SpellID);
         if (!spellInfo)
             continue;
 
@@ -606,7 +615,7 @@ void LoadDBCStores(const std::string& dataPath)
         if (!spellLevels || !spellLevels->spellLevel)
             continue;
 
-        uint32 classId = GetClassBySkillId(skillAbility->skillId);
+        uint32 classId = GetClassBySkillId(skillAbility->SkillLine);
 
         if (!classId)
             continue;
@@ -624,7 +633,7 @@ void LoadDBCStores(const std::string& dataPath)
         if (!skillLine)
             continue;
 
-        SpellEntry const* spellInfo = sSpellStore.LookupEntry(skillLine->spellId);
+        SpellEntry const* spellInfo = sSpellStore.LookupEntry(skillLine->SpellID);
         if (!spellInfo)
             continue;
 
@@ -642,10 +651,10 @@ void LoadDBCStores(const std::string& dataPath)
                     if (!cFamily)
                         continue;
 
-                    if (skillLine->skillId != cFamily->skillLine[0] && skillLine->skillId != cFamily->skillLine[1])
+                    if (skillLine->SkillLine != cFamily->skillLine[0] && skillLine->SkillLine != cFamily->skillLine[1])
                         continue;
 
-                    if (skillLine->learnOnGetSkill != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
+                    if (skillLine->AquireMethod != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
                         continue;
 
                     sPetFamilySpellsStore[i].insert(spellInfo->Id);
@@ -1118,11 +1127,11 @@ std::list<uint32> GetSpellsForLevels(uint32 classId, uint32 raceMask, uint32 spe
                 if (!skillLine)
                     continue;
 
-                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(skillLine->spellId);
+                SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(skillLine->SpellID);
                 if (!spellInfo)
                     continue;
 
-                if (skillLine->racemask && !(skillLine->racemask & raceMask))
+                if (skillLine->RaceMask && !(skillLine->RaceMask & raceMask))
                     continue;
 
                 if (spellInfo->SpellLevel <= minLevel || spellInfo->SpellLevel > maxLevel)
@@ -1418,6 +1427,22 @@ LFGDungeonEntry const* GetLFGDungeon(uint32 mapId, Difficulty difficulty)
 
         if (dungeon->map == int32(mapId) && Difficulty(dungeon->difficulty) == difficulty)
             return dungeon;
+    }
+
+    return NULL;
+}
+
+SkillRaceClassInfoEntry const* GetSkillRaceClassInfo(uint32 skill, uint8 race, uint8 class_)
+{
+    SkillRaceClassInfoBounds bounds = SkillRaceClassInfoBySkill.equal_range(skill);
+    for (SkillRaceClassInfoMap::iterator itr = bounds.first; itr != bounds.second; ++itr)
+    {
+        if (itr->second->RaceMask && !(itr->second->RaceMask & (1 << (race - 1))))
+            continue;
+        if (itr->second->ClassMask && !(itr->second->ClassMask & (1 << (class_ - 1))))
+            continue;
+
+        return itr->second;
     }
 
     return NULL;

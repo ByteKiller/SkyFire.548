@@ -2112,7 +2112,7 @@ void SpellMgr::LoadSkillLineAbilityMap()
         if (!SkillInfo)
             continue;
 
-        mSkillLineAbilityMap.insert(SkillLineAbilityMap::value_type(SkillInfo->spellId, SkillInfo));
+        mSkillLineAbilityMap.insert(SkillLineAbilityMap::value_type(SkillInfo->SpellID, SkillInfo));
         ++count;
     }
 
@@ -2345,10 +2345,10 @@ void SpellMgr::LoadPetLevelupSpellMap()
                 if (skillLine->skillId != creatureFamily->skillLine[j])
                     continue;
 
-                if (skillLine->learnOnGetSkill != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
+                if (skillLine->AquireMethod != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
                     continue;
 
-                SpellInfo const* spell = GetSpellInfo(skillLine->spellId);
+                SpellInfo const* spell = GetSpellInfo(skillLine->SpellID);
                 if (!spell) // not exist or triggered or talent
                     continue;
 
@@ -3235,7 +3235,7 @@ void SpellMgr::LoadSpellInfoCorrections()
                 spellInfo->Effects[EFFECT_0].MiscValue |= 1;
                 break;
             case 51912: // Crafty's Ultra-Advanced Proto-Typical Shortening Blaster
-                spellInfo->Effects[EFFECT_0].ApplyAuraTickCount = 3000;
+                spellInfo->Effects[EFFECT_0].Amplitude = 3000;
                 break;
             // Master Shapeshifter: missing stance data for forms other than bear - bear version has correct data
             // To prevent aura staying on target after talent unlearned

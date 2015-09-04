@@ -61,7 +61,11 @@ enum WarriorSpells
     SPELL_WARRIOR_UNRELENTING_ASSAULT_TRIGGER_1     = 64849,
     SPELL_WARRIOR_UNRELENTING_ASSAULT_TRIGGER_2     = 64850,
     SPELL_WARRIOR_VIGILANCE_PROC                    = 50725,
-    SPELL_WARRIOR_VENGEANCE                         = 76691
+    SPELL_WARRIOR_VENGEANCE                         = 76691,
+    WARRIOR_SPELL_THUNDER_CLAP                  = 6343,
+    WARRIOR_SPELL_WEAKENED_BLOWS                = 115798,
+    WARRIOR_SPELL_BLOOD_AND_THUNDER             = 84615,
+    WARRIOR_SPELL_DEEP_WOUNDS                   = 115767
 };
 
 enum WarriorSpellIcons
@@ -219,56 +223,32 @@ class spell_warr_concussion_blow : public SpellScriptLoader
 // -12162 - Deep Wounds
 class spell_warr_deep_wounds : public SpellScriptLoader
 {
-    public:
+   public:
         spell_warr_deep_wounds() : SpellScriptLoader("spell_warr_deep_wounds") { }
 
         class spell_warr_deep_wounds_SpellScript : public SpellScript
         {
             PrepareSpellScript(spell_warr_deep_wounds_SpellScript);
 
-            bool Validate(SpellInfo const* /*spellInfo*/) OVERRIDE
+            void HandleOnHit()
             {
-                if (!sSpellMgr->GetSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_RANK_1) ||
-                    !sSpellMgr->GetSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_RANK_2) ||
-                    !sSpellMgr->GetSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_RANK_3) ||
-                    !sSpellMgr->GetSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC))
-                    return false;
-                return true;
-            }
-
-            void HandleDummy(SpellEffIndex /*effIndex*/)
-            {
-                int32 damage = GetEffectValue();
-                Unit* caster = GetCaster();
-                if (Unit* target = GetHitUnit())
+                if (Player* _player = GetCaster()->ToPlayer())
                 {
-                    // apply percent damage mods
-                    damage = caster->SpellDamageBonusDone(target, GetSpellInfo(), damage, SPELL_DIRECT_DAMAGE);
+                    if (GetSpellInfo()->Id == WARRIOR_SPELL_THUNDER_CLAP && !_player->HasAura(WARRIOR_SPELL_BLOOD_AND_THUNDER))
+						return;
 
-                    ApplyPct(damage, 16 * GetSpellInfo()->GetRank());
-
-                    damage = target->SpellDamageBonusTaken(caster, GetSpellInfo(), damage, SPELL_DIRECT_DAMAGE);
-
-                    SpellInfo const* spellInfo = sSpellMgr->GetSpellInfo(SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC);
-                    uint32 ticks = spellInfo->GetDuration() / spellInfo->Effects[EFFECT_0].ApplyAuraTickCount;
-
-                    // Add remaining ticks to damage done
-                    if (AuraEffect const* aurEff = target->GetAuraEffect(SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC, EFFECT_0, caster->GetGUID()))
-                        damage += aurEff->GetAmount() * (ticks - aurEff->GetTickNumber());
-
-                    damage /= ticks;
-
-                    caster->CastCustomSpell(target, SPELL_WARRIOR_DEEP_WOUNDS_RANK_PERIODIC, &damage, NULL, NULL, true);
+					if (Unit* target = GetHitUnit())
+						_player->CastSpell(target, WARRIOR_SPELL_DEEP_WOUNDS);
                 }
             }
 
-            void Register() OVERRIDE
+            void Register()
             {
-                OnEffectHitTarget += SpellEffectFn(spell_warr_deep_wounds_SpellScript::HandleDummy, EFFECT_0, SPELL_EFFECT_DUMMY);
+                OnHit += SpellHitFn(spell_warr_deep_wounds_SpellScript::HandleOnHit);
             }
         };
 
-        SpellScript* GetSpellScript() const OVERRIDE
+        SpellScript* GetSpellScript() const
         {
             return new spell_warr_deep_wounds_SpellScript();
         }

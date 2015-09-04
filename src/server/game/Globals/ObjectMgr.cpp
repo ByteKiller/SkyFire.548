@@ -3232,7 +3232,7 @@ void ObjectMgr::LoadPlayerInfo()
                             {
                                 if (PlayerInfo* info = _playerInfo[raceIndex][classIndex])
                                 {
-                                    info->spell.push_back(spellId);
+                                    info->customSpells.push_back(spellId);
                                     ++count;
                                 }
                                 // We need something better here, the check is not accounting for spells used by multiple races/classes but not all of them.
@@ -7575,34 +7575,27 @@ int32 ObjectMgr::GetBaseReputationOf(FactionEntry const* factionEntry, uint8 rac
     return 0;
 }
 
-SkillRangeType GetSkillRangeType(SkillLineEntry const* pSkill, bool racial)
+SkillRangeType GetSkillRangeType(SkillRaceClassInfoEntry const* rcEntry)
 {
-    switch (pSkill->categoryId)
+    SkillLineEntry const* skill = sSkillLineStore.LookupEntry(rcEntry->SkillID);
+    if (!skill)
+        return SKILL_RANGE_NONE;
+
+    if (sSkillTiersStore.LookupEntry(rcEntry->SkillTierID))
+        return SKILL_RANGE_RANK;
+
+    if (rcEntry->SkillID == SKILL_RUNEFORGING)
+        return SKILL_RANGE_MONO;
+
+    switch (skill->categoryId)
     {
-        case SKILL_CATEGORY_LANGUAGES:
-            return SKILL_RANGE_LANGUAGE;
-        case SKILL_CATEGORY_WEAPON:
-            return SKILL_RANGE_LEVEL;
-        case SKILL_CATEGORY_ARMOR:
-        case SKILL_CATEGORY_CLASS:
-            if (pSkill->id != SKILL_LOCKPICKING)
-                return SKILL_RANGE_MONO;
-            else
-                return SKILL_RANGE_LEVEL;
-        case SKILL_CATEGORY_SECONDARY:
-        case SKILL_CATEGORY_PROFESSION:
-            // not set skills for professions and racial abilities
-            if (IsProfessionSkill(pSkill->id))
-                return SKILL_RANGE_RANK;
-            else if (racial)
-                return SKILL_RANGE_NONE;
-            else
-                return SKILL_RANGE_MONO;
-        default:
-        case SKILL_CATEGORY_ATTRIBUTES:                     //not found in dbc
-        case SKILL_CATEGORY_GENERIC:                        //only GENERIC(DND)
-            return SKILL_RANGE_NONE;
+    case SKILL_CATEGORY_ARMOR:
+        return SKILL_RANGE_MONO;
+    case SKILL_CATEGORY_LANGUAGES:
+        return SKILL_RANGE_LANGUAGE;
     }
+
+    return SKILL_RANGE_LEVEL;
 }
 
 void ObjectMgr::LoadGameTele()

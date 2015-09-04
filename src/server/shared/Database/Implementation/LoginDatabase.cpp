@@ -106,4 +106,10 @@ void LoginDatabaseConnection::DoPrepareStatements()
     PrepareStatement(LOGIN_DEL_RBAC_ACCOUNT_PERMISSION, "DELETE FROM rbac_account_permissions WHERE accountId = ? AND permissionId = ? AND (realmId = ? OR realmId = -1)", CONNECTION_ASYNC);
 
     PrepareStatement(LOGIN_UPD_ACCOUNT_BOOST, "UPDATE account SET hasBoost = ? WHERE id = ?", CONNECTION_ASYNC);
+
+    // Account-Wide Mounts System
+    PrepareStatement(LOGIN_INS_CHAR_SPELL, "INSERT INTO account_spell (accountId, spell, active, disabled) VALUES (?, ?, ?, ?)", CONNECTION_ASYNC);
+    PrepareStatement(LOGIN_SEL_CHARACTER_SPELL, "SELECT spell, active, disabled FROM account_spell WHERE accountId = ?", CONNECTION_ASYNC);
+    PrepareStatement(LOGIN_DEL_CHAR_SPELL_BY_SPELL, "DELETE FROM account_spell WHERE spell = ? AND accountId = ?", CONNECTION_ASYNC);
+    PrepareStatement(LOGIN_DEL_CHAR_SPELL, "DELETE FROM account_spell WHERE accountId = ?", CONNECTION_ASYNC);
 }

@@ -59,6 +59,40 @@ class AuraEffect
         int32 GetPeriodicTimer() const { return m_periodicTimer; }
         void SetPeriodicTimer(int32 periodicTimer) { m_periodicTimer = periodicTimer; }
 
+        struct FixedPeriodic
+        {
+            float fx_crit_chance;
+            int32 fx_fixed_damage;
+            int32 fx_fixed_total_damage;
+            bool bCrit;
+            bool bDamage;
+
+            void Clear()
+            {
+                fx_crit_chance = 0.0f;
+                fx_fixed_damage = 0;
+                fx_fixed_total_damage = 0;
+                bCrit = false;
+                bDamage = false;
+            }
+
+            void SetCriticalChance(float value) { bCrit = true; fx_crit_chance = value; }
+            float GetCriticalChance() const { return fx_crit_chance; }
+            bool HasCritChance() const { return bCrit; }
+
+            void SetFixedDamage(int32 value) { bDamage = true; fx_fixed_damage = value; }
+            void SetFixedTotalDamage(int32 value) { fx_fixed_total_damage = value; }
+            int32 GetFixedDamage() const { return fx_fixed_damage; }
+            int32 GetFixedTotalDamage() const { return fx_fixed_total_damage; }
+            bool HasDamage() const { return bDamage; }
+        };
+
+        bool HasFixedDamageInfo() { return hasFixedPeriodic; }
+        FixedPeriodic& GetFixedDamageInfo() { return m_fixed_periodic; }
+
+        FixedPeriodic m_fixed_periodic;
+        bool hasFixedPeriodic;
+
         int32 CalculateAmount(Unit* caster);
         void CalculatePeriodic(Unit* caster, bool resetPeriodicTimer = true, bool load = false);
         void CalculateSpellMod();

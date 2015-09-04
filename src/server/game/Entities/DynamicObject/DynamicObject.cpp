@@ -27,6 +27,7 @@
 #include "CellImpl.h"
 #include "GridNotifiersImpl.h"
 #include "ScriptMgr.h"
+#include "Unit.h"
 
 DynamicObject::DynamicObject(bool isWorldObject) : WorldObject(isWorldObject),
     _aura(NULL), _removedAura(NULL), _caster(NULL), _duration(0), _isViewpoint(false)

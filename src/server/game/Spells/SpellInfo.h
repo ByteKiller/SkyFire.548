@@ -234,16 +234,17 @@ class SpellEffectInfo
     SpellInfo const* _spellInfo;
     uint8 _effIndex;
 public:
+    uint32    EffectIndex;
     uint32    Effect;
     uint32    ApplyAuraName;
-    uint32    ApplyAuraTickCount;
+    uint32    Amplitude;
     int32     DieSides;
     float     RealPointsPerLevel;
     int32     BasePoints;
     float     PointsPerComboPoint;
+    float     SpellPowerCoeff;
     float     ValueMultiplier;
     float     DamageMultiplier;
-    float     BonusMultiplier;
     int32     MiscValue;
     int32     MiscValueB;
     Mechanics Mechanic;
@@ -260,6 +261,7 @@ public:
     float     ScalingMultiplier;
     float     DeltaScalingMultiplier;
     float     ComboScalingMultiplier;
+    uint32    activatedByAura;
 
     SpellEffectInfo() { }
     SpellEffectInfo(SpellEntry const* spellEntry, SpellInfo const* spellInfo, uint8 effIndex, SpellEffectEntry const* effect);
@@ -393,6 +395,7 @@ public:
     uint32 SpellShapeshiftId;
     uint32 SpellTargetRestrictionsId;
     uint32 SpellTotemsId;
+    uint32 ResearchProjectId;
     // SpellScalingEntry
     int32  CastTimeMin;
     int32  CastTimeMax;
@@ -403,6 +406,10 @@ public:
     SpellEffectInfo Effects[MAX_SPELL_EFFECTS];
     uint32 ExplicitTargetMask;
     SpellChainNode const* ChainEntry;
+
+    // SpecializationSpellsEntry
+    std::list<uint32> SpecializationIdList;
+    std::list<uint32> OverrideSpellList;
 
     // struct access functions
     SpellTargetRestrictionsEntry const* GetSpellTargetRestrictions() const;

@@ -24,7 +24,7 @@
 #include <map>
 
 struct AuctionEntry;
-struct BlackMarketAuction;
+struct BMAuctionEntry; 
 struct CalendarEvent;
 class Item;
 class Object;
@@ -91,7 +91,7 @@ class MailSender
         MailSender(Object* sender, MailStationery stationery = MAIL_STATIONERY_DEFAULT);
         MailSender(CalendarEvent* sender);
         MailSender(AuctionEntry* sender);
-        MailSender(BlackMarketAuction* sender);
+        MailSender(BMAuctionEntry* sender);
         MailSender(Player* sender);
     public:                                                 // Accessors
         MailMessageType GetMailMessageType() const { return m_messageType; }

@@ -13930,29 +13930,79 @@ void Unit::SendDurabilityLoss(Player* receiver, uint32 percent)
     receiver->GetSession()->SendPacket(&data);
 }
 
+void Unit::SetAIAnimKitId(uint16 animKitId)
+{
+    if (_aiAnimKitId == animKitId)
+        return;
+
+    _aiAnimKitId = animKitId;
+
+    WorldPacket data(SMSG_SET_AI_ANIM_KIT, 8 + 2);
+
+    ObjectGuid guid = GetGUID();
+    data.WriteGuidMask(guid, 5, 4, 1, 3, 0, 2, 6, 7);
+
+    data.WriteGuidBytes(guid, 0, 1, 3, 7, 2, 4, 5);
+
+    data << uint16(animKitId);
+
+    data.WriteByteSeq(guid[6]);
+
+    SendMessageToSet(&data, true);
+}
+
+void Unit::SetMovementAnimKitId(uint16 animKitId)
+{
+    if (_movementAnimKitId == animKitId)
+        return;
+
+    _movementAnimKitId = animKitId;
+
+    WorldPacket data(SMSG_SET_MOVEMENT_ANIM_KIT, 9 + 2);
+    
+    data << uint16(animKitId);
+
+    ObjectGuid guid = GetGUID();
+    data.WriteGuidMask(guid, 5, 0, 6, 2, 7, 1, 4, 3);
+
+    data.WriteGuidBytes(guid, 0, 4, 3, 2, 6, 5, 7, 1);
+
+    SendMessageToSet(&data, true);
+}
+
+void Unit::SetMeleeAnimKitId(uint16 animKitId)
+{
+    if (_meleeAnimKitId == animKitId)
+        return;
+
+    _meleeAnimKitId = animKitId;
+
+    WorldPacket data(SMSG_SET_MELEE_ANIM_KIT, 2 + 9);
+
+    ObjectGuid guid = GetGUID();
+    data.WriteGuidMask(guid, 3, 0, 7, 2, 6, 4, 1, 5);
+    
+    data.WriteGuidBytes(guid, 5, 0, 3, 4, 7);
+
+    data << uint16(animKitId);
+
+    data.WriteGuidBytes(guid, 6, 1, 2);
+
+    SendMessageToSet(&data, true);
+}
+
 void Unit::PlayOneShotAnimKit(uint32 id)
 {
-    ObjectGuid Guid;
-    WorldPacket data(SMSG_PLAY_ONE_SHOT_ANIM_KIT, 7 + 2);
+    WorldPacket data(SMSG_PLAY_ONE_SHOT_ANIM_KIT, 2 + 9);
 
-    data.WriteBit(Guid[3]);
-    data.WriteBit(Guid[1]);
-    data.WriteBit(Guid[7]);
-    data.WriteBit(Guid[6]);
-    data.WriteBit(Guid[0]);
-    data.WriteBit(Guid[4]);
-    data.WriteBit(Guid[5]);
-    data.WriteBit(Guid[2]);
+    ObjectGuid guid = GetGUID();
+    data.WriteGuidMask(guid, 3, 1, 7, 6, 0, 4, 5, 2);
     
-    data.WriteByteSeq(Guid[3]);
-    data.WriteByteSeq(Guid[6]);
-    data.WriteByteSeq(Guid[1]);
-    data.WriteByteSeq(Guid[4]);
+    data.WriteGuidBytes(guid, 3, 6, 1, 4);
+
     data << uint16(id);
-    data.WriteByteSeq(Guid[2]);
-    data.WriteByteSeq(Guid[7]);
-    data.WriteByteSeq(Guid[5]);
-    data.WriteByteSeq(Guid[0]);
+
+    data.WriteGuidBytes(guid, 2, 7, 5, 0);
 
     SendMessageToSet(&data, true);
 }
@@ -16197,10 +16247,6 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
         case MSETransportTime2:
             if (hasTransportData && hasTransportTime2)
                 data << mi.transport.time2;
-            break;
-        case MSETransportTime3:
-            if (hasTransportData && hasTransportTime3)
-                data << mi.transport.time3;
             break;
         case MSEPitch:
             if (hasPitch)

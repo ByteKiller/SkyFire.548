@@ -250,14 +250,19 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
     }
 
     if (Unit const* unit = ToUnit())
+    {
         if (unit->GetVictim())
             flags |= UPDATEFLAG_HAS_TARGET;
+
+        if (unit->GetAIAnimKitId() || unit->GetMovementAnimKitId() || unit->GetMeleeAnimKitId())
+            flags |= UPDATEFLAG_ANIMKITS;
+    }
 
     ByteBuffer buf(500);
     buf << uint8(updateType);
     buf.append(GetPackGUID());
     buf << uint8(m_objectTypeId);
-
+    
     BuildMovementUpdate(&buf, flags);
     BuildValuesUpdate(updateType, &buf, target);
     data->AddUpdateBlock(buf);
@@ -310,30 +315,18 @@ void Object::DestroyForPlayer(Player* target, bool onDeath) const
 
     WorldPacket data(SMSG_DESTROY_OBJECT, 2 + 8);
     ObjectGuid guid(GetGUID());
-
-    data.WriteBit(guid[3]);
-    data.WriteBit(guid[2]);
-    data.WriteBit(guid[4]);
-    data.WriteBit(guid[1]);
+    
+    // BuildOutOfRangeUpdateBlock(GetGUID());
+    data.WriteGuidMask(guid, 3, 2, 4, 1);
 
     //! If the following bool is true, the client will call "void CGUnit_C::OnDeath()" for this object.
     //! OnDeath() does for eg trigger death animation and interrupts certain spells/missiles/auras/sounds...
     data.WriteBit(onDeath);
 
-    data.WriteBit(guid[7]);
-    data.WriteBit(guid[0]);
-    data.WriteBit(guid[6]);
-    data.WriteBit(guid[5]);
+    data.WriteGuidMask(guid, 7, 0, 6, 5);
     data.FlushBits();
 
-    data.WriteByteSeq(guid[0]);
-    data.WriteByteSeq(guid[4]);
-    data.WriteByteSeq(guid[7]);
-    data.WriteByteSeq(guid[2]);
-    data.WriteByteSeq(guid[6]);
-    data.WriteByteSeq(guid[3]);
-    data.WriteByteSeq(guid[1]);
-    data.WriteByteSeq(guid[5]);
+    data.WriteGuidBytes(guid, 0, 4, 7, 2, 6, 3, 1, 5);
 
     target->GetSession()->SendPacket(&data);
 }
@@ -389,9 +382,9 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
     bool hasGobjectRotation = flags & UPDATEFLAG_ROTATION;
     bool hasTransportPosition = flags & UPDATEFLAG_GO_TRANSPORT_POSITION;
     bool hasTarget = flags & UPDATEFLAG_HAS_TARGET;
-    bool hasTransport = flags & UPDATEFLAG_TRANSPORT;
     bool hasVehicle = flags & UPDATEFLAG_VEHICLE;
-    bool hasAnimKits = false; //flags & UPDATEFLAG_ANIMKITS;
+    bool hasTransport = flags & UPDATEFLAG_TRANSPORT;
+    bool hasAnimKits = flags & UPDATEFLAG_ANIMKITS;
 
     bool hasFallData;
     bool hasFallDirection;
@@ -403,12 +396,17 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
     uint32 movementFlags;
     uint32 movementFlagsExtra;
 
+    uint32 stopFrameCount = 0;
+    if (GameObject const* go = ToGameObject())
+        if (go->GetGoType() == GAMEOBJECT_TYPE_TRANSPORT)
+            stopFrameCount = go->GetGOValue()->Transport.StopFrames->size();
+
     data->WriteBit(0);
     data->WriteBit(hasAnimKits);
     data->WriteBit(hasLiving);
     data->WriteBit(0);
     data->WriteBit(0);
-    data->WriteBits(0, 22);
+    data->WriteBits(stopFrameCount, 22);
     data->WriteBit(hasVehicle);
     data->WriteBit(0);
     data->WriteBit(0);
@@ -453,7 +451,7 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
             ObjectGuid transGuid = self->m_movementInfo.transport.guid;
             data->WriteBit(transGuid[4]);
             data->WriteBit(transGuid[2]);
-            data->WriteBit(self->m_movementInfo.transport.time3 && self->m_movementInfo.transport.guid);
+            data->WriteBit(self->m_movementInfo.transport.vehicleId != 0);
             data->WriteBit(transGuid[0]);
             data->WriteBit(transGuid[1]);
             data->WriteBit(transGuid[3]);
@@ -512,17 +510,17 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
         data->WriteBit(transGuid[3]);
         data->WriteBit(transGuid[2]);
         data->WriteBit(transGuid[7]);
-        data->WriteBit(self->m_movementInfo.transport.time3 && self->m_movementInfo.transport.guid);
+        data->WriteBit(self->m_movementInfo.transport.vehicleId != 0);
     }
 
-    /*
     if (hasAnimKits)
     {
-        data->WriteBit(1);  // Missing AnimKit1
-        data->WriteBit(1);  // Missing AnimKit2
-        data->WriteBit(1);  // Missing AnimKit3
+        // Not sure about the order
+        Unit const* unit = ToUnit();
+        data->WriteBit(unit->GetAIAnimKitId() == 0);
+        data->WriteBit(unit->GetMovementAnimKitId() == 0);
+        data->WriteBit(unit->GetMeleeAnimKitId() == 0);
     }
-    */
 
     if (hasTarget)
     {
@@ -540,6 +538,10 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
 
     data->FlushBits();
 
+    if (GameObject const* go = ToGameObject())
+        for (uint32 i = 0; i < stopFrameCount; ++i)
+            *data << uint32(go->GetGOValue()->Transport.StopFrames->at(i));
+
     if (hasLiving)
     {
         Unit const* self = ToUnit();
@@ -552,8 +554,8 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
             data->WriteByteSeq(transGuid[7]);
             *data << float(self->GetTransOffsetX());
 
-            if (self->m_movementInfo.transport.time3 && self->m_movementInfo.transport.guid)
-                *data << uint32(self->m_movementInfo.transport.time3);
+            if (self->m_movementInfo.transport.vehicleId)
+                *data << uint32(self->m_movementInfo.transport.vehicleId);
 
             *data << float(self->GetTransOffsetO());
             *data << float(self->GetTransOffsetY());
@@ -630,7 +632,6 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
         *data << float(self->GetSpeed(MOVE_RUN));
         *data << float(self->GetSpeed(MOVE_SWIM));
         *data << float(self->GetPositionZMinusOffset());
-
     }
 
     if (hasTransportPosition)
@@ -648,8 +649,8 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
         data->WriteBit(transGuid[4]);
         data->WriteBit(transGuid[1]);
 
-        if (self->m_movementInfo.transport.time3 && self->m_movementInfo.transport.guid)
-            *data << uint32(self->m_movementInfo.transport.time3);
+        if (self->m_movementInfo.transport.vehicleId)
+            *data << uint32(self->m_movementInfo.transport.vehicleId);
 
         *data << uint32(self->GetTransTime());
 
@@ -696,16 +697,16 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 flags) const
         *data << float(self->GetPositionX());
     }
 
-    /*
     if (hasAnimKits)
     {
-        if (hasAnimKit3)
-            *data << uint16(animKit3);
-        if (hasAnimKit2)
-            *data << uint16(animKit2);
-        if (hasAnimKit1)
-            *data << uint16(animKit1);
-    }*/
+        Unit const* unit = ToUnit();
+        if (unit->GetMeleeAnimKitId())
+            *data << uint16(unit->GetMeleeAnimKitId());
+        if (unit->GetMovementAnimKitId())
+            *data << uint16(unit->GetMovementAnimKitId());
+        if (unit->GetAIAnimKitId())
+            *data << uint16(unit->GetAIAnimKitId());
+    }
 
     if (hasTransport)
     {
@@ -739,7 +740,7 @@ void Object::BuildValuesUpdate(uint8 updateType, ByteBuffer* data, Player* targe
     for (uint16 index = 0; index < m_valuesCount; ++index)
     {
         if ((_fieldNotifyFlags & flags[index] ||
-             ((updateType == UPDATETYPE_VALUES ? _changesMask.GetBit(index) : m_uint32Values[index]) && (flags[index] & visibleFlag))))
+            ((updateType == UPDATETYPE_VALUES ? _changesMask.GetBit(index) : m_uint32Values[index]) && (flags[index] & visibleFlag))))
         {
             updateMask.SetBit(index);
             fieldBuffer << m_uint32Values[index];
@@ -755,21 +756,20 @@ void Object::BuildValuesUpdate(uint8 updateType, ByteBuffer* data, Player* targe
 
 void Object::BuildDynamicValuesUpdate(ByteBuffer *data) const
 {
-    // Only handle Item type
-    // TODO: Implement Player dynamis fields
-    if (m_objectTypeId != TYPEID_ITEM)
+    if (m_objectTypeId == TYPEID_CONTAINER)
     {
         *data << uint8(0);
         return;
     }
 
-    // Dynamic Fields (5.0.5 MoP new fields)
     uint32 dynamicTabMask = 0;
     std::vector<uint32> dynamicFieldsMask;
     dynamicFieldsMask.resize(m_dynamicTab.size());
 
     for (size_t i = 0; i < m_dynamicTab.size(); i++)
+    {
         dynamicFieldsMask[i] = 0;
+    }
 
     for (size_t i = 0; i < m_dynamicChange.size(); i++)
     {
@@ -784,6 +784,7 @@ void Object::BuildDynamicValuesUpdate(ByteBuffer *data) const
     }
 
     *data << uint8(bool(dynamicTabMask));
+
     if (dynamicTabMask)
     {
         *data << uint32(dynamicTabMask);
@@ -886,6 +887,10 @@ uint32 Object::GetUpdateFieldData(Player const* target, uint32*& flags) const
             flags = AreaTriggerUpdateFieldFlags;
             break;
         case TYPEID_OBJECT:
+            flags = ObjectUpdateFieldFlags;
+            break;
+        case TYPEID_SCENEOBJECT:
+            flags = SceneObjectUpdateFieldFlags;
             break;
     }
 
@@ -1384,8 +1389,8 @@ void MovementInfo::OutDebug()
         TC_LOG_INFO("misc", "time: %u", transport.time);
         if (flags2 & MOVEMENTFLAG2_INTERPOLATED_MOVEMENT)
             TC_LOG_INFO("misc", "time2: %u", transport.time2);
-        if (transport.time3)
-            TC_LOG_INFO("misc", "time3: %u", transport.time3);
+        if (transport.vehicleId)
+            TC_LOG_INFO("misc", "VehicleId: %u", transport.vehicleId);
     }
 
     if ((flags & (MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_FLYING)) || (flags2 & MOVEMENTFLAG2_ALWAYS_ALLOW_PITCHING))

@@ -1135,7 +1135,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     InitGlyphsForLevel();
     InitTalentForLevel();
     InitSpellForLevel();
-    InitPrimaryProfessions();                               // to max set before any spell added
+    InitPrimaryProfessions();
 
     // apply original stats mods before spell loading or item equipment that call before equip _RemoveStatsMods()
     UpdateMaxHealth();                                      // Update max Health (for add bonus from stamina)
@@ -1587,7 +1587,7 @@ void Player::Update(uint32 p_time)
         return;
 
     // undelivered mail
-    if (m_nextMailDelivereTime && m_nextMailDelivereTime <= time(nullptr))
+    if (m_nextMailDelivereTime && m_nextMailDelivereTime <= time(NULL))
     {
         SendNewMail();
         ++unReadMails;
@@ -1604,7 +1604,7 @@ void Player::Update(uint32 p_time)
         //TC_LOG_FATAL("entities.player", "Player has m_pad %u during update!", m_pad);
         //if (m_spellModTakingSpell)
         TC_LOG_FATAL("spells", "Player has m_spellModTakingSpell %u during update!", m_spellModTakingSpell->m_spellInfo->Id);
-        m_spellModTakingSpell = nullptr;
+        m_spellModTakingSpell = NULL;
     }
 
     //used to implement delayed far teleports
@@ -1612,7 +1612,7 @@ void Player::Update(uint32 p_time)
     Unit::Update(p_time);
     SetCanDelayTeleport(false);
 
-    time_t now = time(nullptr);
+    time_t now = time(NULL);
 
     UpdatePvPFlag(now);
 
@@ -1709,9 +1709,24 @@ void Player::Update(uint32 p_time)
                         if (getAttackTimer(OFF_ATTACK) < ATTACK_DISPLAY_DELAY)
                             setAttackTimer(OFF_ATTACK, ATTACK_DISPLAY_DELAY);
 
-                    // do attack
-                    AttackerStateUpdate(victim, BASE_ATTACK);
-                    resetAttackTimer(BASE_ATTACK);
+                    // do attack if player doesn't have Ascendance for Enhanced Shamans or Shadow Blades for rogues
+                    if (!HasAura(114051) && !HasAura(121471))
+                    {
+                        AttackerStateUpdate(victim, BASE_ATTACK);
+                        resetAttackTimer(BASE_ATTACK);
+                    }
+                    // Custom MoP Script - Wind Lash
+                    else if (HasAura(114051))
+                    {
+                        CastSpell(victim, 114089, true);
+                        resetAttackTimer(BASE_ATTACK);
+                    }
+                    // Shadow Blade - Main Hand
+                    else if (HasAura(121471))
+                    {
+                        CastSpell(victim, 121473, true);
+                        resetAttackTimer(BASE_ATTACK);
+                    }
                 }
             }
 
@@ -1727,19 +1742,26 @@ void Player::Update(uint32 p_time)
                     if (getAttackTimer(BASE_ATTACK) < ATTACK_DISPLAY_DELAY)
                         setAttackTimer(BASE_ATTACK, ATTACK_DISPLAY_DELAY);
 
-                    // do attack
-                    AttackerStateUpdate(victim, OFF_ATTACK);
-                    resetAttackTimer(OFF_ATTACK);
+                    // do attack if player doesn't have Ascendance for Enhanced Shamans or Shadow Blades for rogues
+                    if (!HasAura(114051) && !HasAura(121471))
+                    {
+                        AttackerStateUpdate(victim, OFF_ATTACK);
+                        resetAttackTimer(OFF_ATTACK);
+                    }
+                    // Custom MoP Script - Wind Lash Off-Hand
+                    else if (HasAura(114051))
+                    {
+                        CastSpell(victim, 114093, true);
+                        resetAttackTimer(OFF_ATTACK);
+                    }
+                    // Shadow Blades - Off Hand
+                    else if (HasAura(121471))
+                    {
+                        CastSpell(victim, 121474, true);
+                        resetAttackTimer(OFF_ATTACK);
+                    }
                 }
             }
-
-            /*Unit* owner = victim->GetOwner();
-            Unit* u = owner ? owner : victim;
-            if (u->IsPvP() && (!duel || duel->opponent != u))
-            {
-                UpdatePvP(true);
-                RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_ENTER_PVP_COMBAT);
-            }*/
         }
     }
 
@@ -1747,13 +1769,13 @@ void Player::Update(uint32 p_time)
     {
         if (roll_chance_i(3) && GetTimeInnEnter() > 0)      // freeze update
         {
-            time_t time_inn = time(nullptr)-GetTimeInnEnter();
+            time_t time_inn = time(NULL)-GetTimeInnEnter();
             if (time_inn >= 10)                             // freeze update
             {
                 float bubble = 0.125f*sWorld->getRate(RATE_REST_INGAME);
                                                             // speed collect rest bonus (section/in hour)
                 SetRestBonus(GetRestBonus()+ time_inn*((float)GetUInt32Value(PLAYER_FIELD_NEXT_LEVEL_XP)/72000)*bubble);
-                UpdateInnerTime(time(nullptr));
+                UpdateInnerTime(time(NULL));
             }
         }
     }
@@ -1862,6 +1884,12 @@ void Player::Update(uint32 p_time)
         }
         else
             m_deathTimer -= p_time;
+    }
+
+    if (m_knockBackTimer)
+    {
+        if( m_knockBackTimer + 2000 < getMSTime())
+            m_knockBackTimer = 0;
     }
 
     UpdateEnchantTime(p_time);
@@ -17801,10 +17829,10 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
     for (uint8 slot = EQUIPMENT_SLOT_START; slot < EQUIPMENT_SLOT_END; ++slot)
     {
         SetUInt64Value(PLAYER_FIELD_INV_SLOTS + (slot * 2), 0);
-        SetVisibleItemSlot(slot, nullptr);
+        SetVisibleItemSlot(slot, NULL);
 
         delete m_items[slot];
-        m_items[slot] = nullptr;
+        m_items[slot] = NULL;
     }
 
     TC_LOG_DEBUG("entities.player.loading", "Load Basic value of player %s is: ", m_name.c_str());
@@ -17862,7 +17890,7 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
     // Player was saved in Arena or Bg
     else if (mapEntry && mapEntry->IsBattlegroundOrArena())
     {
-        Battleground* currentBg = nullptr;
+        Battleground* currentBg = NULL;
         if (m_bgData.bgInstanceID)                                                //saved in Battleground
             currentBg = sBattlegroundMgr->GetBattleground(m_bgData.bgInstanceID, BATTLEGROUND_TYPE_NONE);
 
@@ -17957,7 +17985,7 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
         else if (!m_taxi.LoadTaxiDestinationsFromString(taxi_nodes, GetTeam()))
         {
             // problems with taxi path loading
-            TaxiNodesEntry const* nodeEntry = nullptr;
+            TaxiNodesEntry const* nodeEntry = NULL;
             if (uint32 node_id = m_taxi.GetTaxiSource())
                 nodeEntry = sTaxiNodesStore.LookupEntry(node_id);
 
@@ -18066,7 +18094,7 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
 
     SaveRecallPosition();
 
-    time_t now = time(nullptr);
+    time_t now = time(NULL);
     time_t logoutTime = time_t(fields[22].GetUInt32());
 
     // since last logout (in seconds)
@@ -19979,8 +20007,10 @@ void Player::SaveToDB(bool create /*=false*/)
     TC_LOG_DEBUG("entities.unit", "The value of player %s at save: ", m_name.c_str());
     outDebugValues();
 
-    PreparedStatement* stmt = nullptr;
+    PreparedStatement* stmt = NULL;
     uint8 index = 0;
+
+    Pet* pet = GetPet(); // Lets check if we got a pet and then check later what place to set it to.
 
     if (create)
     {
@@ -20014,8 +20044,8 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setUInt32(index++, m_Played_time[PLAYED_TIME_TOTAL]);
         stmt->setUInt32(index++, m_Played_time[PLAYED_TIME_LEVEL]);
         stmt->setFloat(index++, finiteAlways(m_rest_bonus));
-        stmt->setUInt32(index++, uint32(time(nullptr)));
-        stmt->setUInt8(index++,  (HasFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ? 1 : 0));
+        stmt->setUInt32(index++, uint32(time(NULL)));
+        stmt->setUInt8(index++, (HasFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ? 1 : 0));
         //save, far from tavern/city
         //save, but in tavern/city
         stmt->setUInt32(index++, GetTalentResetCost());
@@ -20026,10 +20056,12 @@ void Player::SaveToDB(bool create /*=false*/)
             ss << GetSpecializationId(i) << " ";
         stmt->setString(index++, ss.str());
         stmt->setUInt16(index++, (uint16)m_ExtraFlags);
-        stmt->setUInt8(index++,  m_stableSlots);
+        stmt->setUInt8(index++, m_stableSlots);
         stmt->setUInt16(index++, (uint16)m_atLoginFlags);
         stmt->setUInt16(index++, GetZoneId());
         stmt->setUInt32(index++, uint32(m_deathExpireTime));
+
+        SetPetSlot(m_stableSlots); // Set it to the start pet at the create time.
 
         ss.str("");
         ss << m_taxi.SaveTaxiDestinationsToString();
@@ -20046,7 +20078,7 @@ void Player::SaveToDB(bool create /*=false*/)
         uint32 storedPowers = 0;
         for (uint32 i = 0; i < MAX_POWERS; ++i)
         {
-            if (GetPowerIndex(i) != MAX_POWERS)
+            if (GetPowerIndexByClass(Powers(i), getClass()) != MAX_POWERS)
             {
                 stmt->setUInt32(index++, GetUInt32Value(UNIT_FIELD_POWER + storedPowers));
                 if (++storedPowers >= MAX_POWERS_PER_CLASS)
@@ -20061,6 +20093,9 @@ void Player::SaveToDB(bool create /*=false*/)
 
         stmt->setUInt8(index++, GetSpecsCount());
         stmt->setUInt8(index++, GetActiveSpec());
+
+        stmt->setUInt32(index++, 0);
+        stmt->setUInt32(index++, 0);
 
         ss.str("");
         for (uint32 i = 0; i < PLAYER_EXPLORED_ZONES_SIZE; ++i)
@@ -20084,7 +20119,7 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setString(index++, ss.str());
 
         ss.str("");
-        for (uint32 i = 0; i < KNOWN_TITLES_SIZE*2; ++i)
+        for (uint32 i = 0; i < KNOWN_TITLES_SIZE * 2; ++i)
             ss << GetUInt32Value(PLAYER_FIELD_KNOWN_TITLES + i) << ' ';
         stmt->setString(index++, ss.str());
 
@@ -20134,19 +20169,26 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setUInt32(index++, m_Played_time[PLAYED_TIME_TOTAL]);
         stmt->setUInt32(index++, m_Played_time[PLAYED_TIME_LEVEL]);
         stmt->setFloat(index++, finiteAlways(m_rest_bonus));
-        stmt->setUInt32(index++, uint32(time(nullptr)));
-        stmt->setUInt8(index++,  (HasFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ? 1 : 0));
+        stmt->setUInt32(index++, uint32(time(NULL)));
+        stmt->setUInt8(index++, (HasFlag(PLAYER_FIELD_PLAYER_FLAGS, PLAYER_FLAGS_RESTING) ? 1 : 0));
         //save, far from tavern/city
         //save, but in tavern/city
         stmt->setUInt32(index++, GetTalentResetCost());
         stmt->setUInt32(index++, GetTalentResetTime());
 
+        if (pet && pet->GetEntry() && pet->GetEntry() == PET_ENTRY_IMP)
+            SetPetSlot(0, true);
+
         ss.str("");
         for (uint8 i = 0; i < MAX_TALENT_SPECS; ++i)
             ss << GetSpecializationId(i) << " ";
+
+        if (getClass() == CLASS_MAGE)
+            SetPetSlot(PET_SAVE_NOT_IN_SLOT);
+
         stmt->setString(index++, ss.str());
         stmt->setUInt16(index++, (uint16)m_ExtraFlags);
-        stmt->setUInt8(index++,  m_stableSlots);
+        stmt->setUInt8(index++, (GetPetSlot())); // m_stableSlots); // This is where we update our current slot.
         stmt->setUInt16(index++, (uint16)m_atLoginFlags);
         stmt->setUInt16(index++, GetZoneId());
         stmt->setUInt32(index++, uint32(m_deathExpireTime));
@@ -20166,7 +20208,7 @@ void Player::SaveToDB(bool create /*=false*/)
         uint32 storedPowers = 0;
         for (uint32 i = 0; i < MAX_POWERS; ++i)
         {
-            if (GetPowerIndex(i) != MAX_POWERS)
+            if (GetPowerIndexByClass(Powers(i), getClass()) != MAX_POWERS)
             {
                 stmt->setUInt32(index++, GetUInt32Value(UNIT_FIELD_POWER + storedPowers));
                 if (++storedPowers >= MAX_POWERS_PER_CLASS)
@@ -20181,6 +20223,9 @@ void Player::SaveToDB(bool create /*=false*/)
 
         stmt->setUInt8(index++, GetSpecsCount());
         stmt->setUInt8(index++, GetActiveSpec());
+
+        stmt->setUInt32(index++, GetSpecializationId(0));
+        stmt->setUInt32(index++, GetSpecializationId(1));
 
         ss.str("");
         for (uint32 i = 0; i < PLAYER_EXPLORED_ZONES_SIZE; ++i)
@@ -20205,7 +20250,7 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setString(index++, ss.str());
 
         ss.str("");
-        for (uint32 i = 0; i < KNOWN_TITLES_SIZE*2; ++i)
+        for (uint32 i = 0; i < KNOWN_TITLES_SIZE * 2; ++i)
             ss << GetUInt32Value(PLAYER_FIELD_KNOWN_TITLES + i) << ' ';
 
         stmt->setString(index++, ss.str());
@@ -20213,6 +20258,10 @@ void Player::SaveToDB(bool create /*=false*/)
         stmt->setUInt32(index++, m_grantableLevels);
 
         stmt->setUInt8(index++, IsInWorld() && !GetSession()->PlayerLogout() ? 1 : 0);
+
+        stmt->setUInt32(index++, GetSpecializationResetCost());
+        stmt->setUInt32(index++, GetSpecializationResetTime());
+
         // Index
         stmt->setUInt32(index++, GetGUIDLow());
     }
@@ -20248,6 +20297,8 @@ void Player::SaveToDB(bool create /*=false*/)
     _SaveInstanceTimeRestrictions(trans);
     _SaveCurrency(trans);
     _SaveCUFProfiles(trans);
+    _SaveResearchHistory(trans);
+    _SaveResearchProjects(trans);
     m_battlePetMgr->SaveToDb(trans);
 
     // check if stats should only be saved on logout
@@ -20256,11 +20307,13 @@ void Player::SaveToDB(bool create /*=false*/)
         _SaveStats(trans);
 
     CharacterDatabase.CommitTransaction(trans);
+    LoginDatabase.CommitTransaction(accountTrans);
 
     // save pet (hunter pet level and experience and all type pets health/mana).
-    if (Pet* pet = GetPet())
-        pet->SavePetToDB(PET_SAVE_AS_CURRENT);
+    if (pet && getClass() == CLASS_HUNTER)
+        pet->SavePetToDB(PetSaveMode(GetPetSlot()));
 }
+
 
 // fast save function for item/money cheating preventing - save only inventory and money state
 void Player::SaveInventoryAndGoldToDB(SQLTransaction& trans)
@@ -27793,6 +27846,7 @@ void Player::ActivateSpec(uint8 spec)
 
     SetUsedTalentCount(spentTalents);
     InitTalentForLevel();
+    InitSpellForLevel();
 
     {
         PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARACTER_ACTIONS_SPEC);
@@ -28697,9 +28751,6 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
                 if (hasTransportData && hasTransportTime2)
                     data >> mi->transport.time2;
                 break;
-            case MSETransportTime3:
-                if (hasTransportData && hasTransportTime3)
-                    data >> mi->transport.time3;
                 break;
             case MSEPitch:
                 if (hasPitch)

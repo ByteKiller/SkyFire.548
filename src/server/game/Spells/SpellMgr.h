@@ -616,7 +616,7 @@ class SpellMgr
     // Accessors (const or static functions)
     public:
         // Spell correctness for client using
-        static bool IsSpellValid(SpellInfo const* spellInfo, Player* player = NULL, bool msg = true);
+        static bool IsSpellValid(SpellInfo const* spellInfo, Player* player = nullptr, bool msg = true);
 
         // Spell difficulty
         uint32 GetSpellDifficultyId(uint32 spellId) const;
@@ -694,13 +694,14 @@ class SpellMgr
         SpellAreaForAreaMapBounds GetSpellAreaForAreaMapBounds(uint32 area_id) const;
 
         // SpellInfo object management
-        SpellInfo const* GetSpellInfo(uint32 spellId) const { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
+        SpellInfo const* GetSpellInfo(uint32 spellId) const { return spellId < GetSpellInfoStoreSize() ? mSpellInfoMap[spellId] : nullptr; }
         uint32 GetSpellInfoStoreSize() const { return mSpellInfoMap.size(); }
         std::set<uint32> GetSpellClassList(uint8 ClassID) const { return mSpellClassInfo[ClassID]; }
+        std::list<uint32> const* GetSpellOverrideInfo(uint32 spellId) { return mSpellOverrideInfo.find(spellId) == mSpellOverrideInfo.end() ? nullptr : &mSpellOverrideInfo[spellId]; }
         bool IsTalent(uint32 spellId) { return mTalentSpellInfo.find(spellId) != mTalentSpellInfo.end() ? true : false; }
 
     private:
-        SpellInfo* _GetSpellInfo(uint32 spellId) { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : NULL; }
+        SpellInfo* _GetSpellInfo(uint32 spellId) { return spellId < GetSpellInfoStoreSize() ?  mSpellInfoMap[spellId] : nullptr; }
 
     // Modifiers
     public:
@@ -732,6 +733,8 @@ class SpellMgr
         void UnloadSpellInfoImplicitTargetConditionLists();
         void LoadSpellInfoCustomAttributes();
         void LoadSpellInfoCorrections();
+        void LoadTalentSpellInfo();
+        void LoadSpellClassInfo();
 
     private:
         SpellDifficultySearcherMap mSpellDifficultySearcherMap;

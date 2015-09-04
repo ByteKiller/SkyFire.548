@@ -413,20 +413,20 @@ void CharacterBooster::HandleCharacterBoost()
 
     switch (m_charBoostInfo.action)
     {
-        case CHARACTER_BOOST_ITEMS:
-            m_session->SendBattlePayDistributionUpdate(m_charBoostInfo.charGuid, CHARACTER_BOOST, m_charBoostInfo.action,
-                                                       CHARACTER_BOOST_TEXT_ID, CHARACTER_BOOST_BONUS_TEXT, CHARACTER_BOOST_BONUS_TEXT2);
-            m_charBoostInfo.action = CHARACTER_BOOST_APPLIED;
-            m_timer = 500;
-            m_sendPacket = true;
-            break;
-        case CHARACTER_BOOST_APPLIED:
-            m_session->SendBattlePayDistributionUpdate(m_charBoostInfo.charGuid, CHARACTER_BOOST, m_charBoostInfo.action,
-                                                       CHARACTER_BOOST_TEXT_ID, CHARACTER_BOOST_BONUS_TEXT, CHARACTER_BOOST_BONUS_TEXT2);
-            m_charBoostInfo = CharacterBoostData();
-            break;
-        default:
-            break;
+    case CHARACTER_BOOST_ITEMS:
+        m_session->SendBattlePayDistributionUpdate(m_charBoostInfo.charGuid, CHARACTER_BOOST, m_charBoostInfo.action,
+            CHARACTER_BOOST_TEXT_ID, CHARACTER_BOOST_BONUS_TEXT, CHARACTER_BOOST_BONUS_TEXT2);
+        m_charBoostInfo.action = CHARACTER_BOOST_APPLIED;
+        m_timer = 500;
+        m_sendPacket = true;
+        break;
+    case CHARACTER_BOOST_APPLIED:
+        m_session->SendBattlePayDistributionUpdate(m_charBoostInfo.charGuid, CHARACTER_BOOST, m_charBoostInfo.action,
+            CHARACTER_BOOST_TEXT_ID, CHARACTER_BOOST_BONUS_TEXT, CHARACTER_BOOST_BONUS_TEXT2);
+        m_charBoostInfo = CharacterBoostData();
+        break;
+    default:
+        break;
     }
 }
 

@@ -3744,3 +3744,192 @@ void SpellMgr::LoadSpellInfoCorrections()
 
     TC_LOG_INFO("server.loading", ">> Loaded SpellInfo corrections in %u ms", GetMSTimeDiffToNow(oldMSTime));
 }
+
+static const uint32 SkillClass[MAX_CLASSES] = { 0, 840, 800, 795, 921, 804, 796, 924, 904, 849, 829, 798 };
+
+void SpellMgr::LoadSpellClassInfo()
+{
+    mSpellClassInfo.resize(MAX_CLASSES);
+    for (int ClassID = 0; ClassID < MAX_CLASSES; ClassID++)
+    {
+        ChrClassesEntry const* classEntry = sChrClassesStore.LookupEntry(ClassID);
+        if (!classEntry)
+            continue;
+
+		// Riding spells, so players know it already, only for testing until realm type has been decided
+		// Master Riding
+		mSpellClassInfo[ClassID].insert(90265);
+
+		// Flight Master's License
+		mSpellClassInfo[ClassID].insert(90267);
+
+		// Cold Weather Flying
+		mSpellClassInfo[ClassID].insert(54197);
+
+		// Wisdom of the Four Winds
+		mSpellClassInfo[ClassID].insert(115913);
+
+		// Cloud Serpent Riding
+		mSpellClassInfo[ClassID].insert(130487);
+
+		// Player damage reduction (40% base resilience)
+        mSpellClassInfo[ClassID].insert(115043);
+
+		// Player damage reduction (37% base resilience)
+		mSpellClassInfo[ClassID].insert(142689);
+
+		// Battle Fatigue (60% Reduced Healing in PvP)
+		mSpellClassInfo[ClassID].insert(134732);
+
+        // Player mastery activation
+        mSpellClassInfo[ClassID].insert(114585);
+
+		// All Rune for DK
+        if (ClassID == CLASS_DEATH_KNIGHT)
+        {
+            mSpellClassInfo[ClassID].insert(53323);
+            mSpellClassInfo[ClassID].insert(54447);
+            mSpellClassInfo[ClassID].insert(53342);
+            mSpellClassInfo[ClassID].insert(53331);
+            mSpellClassInfo[ClassID].insert(54446);
+            mSpellClassInfo[ClassID].insert(53323);
+            mSpellClassInfo[ClassID].insert(53344);
+            mSpellClassInfo[ClassID].insert(70164);
+            mSpellClassInfo[ClassID].insert(62158);
+        }
+
+        // Swift Flight Form
+        if (ClassID == CLASS_DRUID)
+            mSpellClassInfo[ClassID].insert(40120);
+
+        // Dark Soul
+        if (ClassID == CLASS_WARLOCK)
+            mSpellClassInfo[ClassID].insert(77801);
+
+        // All portals and teleports for mages and Mana Attunement
+        if (ClassID == CLASS_MAGE)
+        {
+            mSpellClassInfo[ClassID].insert(121039);
+            mSpellClassInfo[ClassID].insert(3561);
+            mSpellClassInfo[ClassID].insert(3562);
+            mSpellClassInfo[ClassID].insert(3563);
+            mSpellClassInfo[ClassID].insert(3565);
+            mSpellClassInfo[ClassID].insert(3566);
+            mSpellClassInfo[ClassID].insert(3567);
+            mSpellClassInfo[ClassID].insert(32271);
+            mSpellClassInfo[ClassID].insert(32272);
+            mSpellClassInfo[ClassID].insert(49359);
+            mSpellClassInfo[ClassID].insert(49360);
+            mSpellClassInfo[ClassID].insert(32266);
+            mSpellClassInfo[ClassID].insert(32267);
+            mSpellClassInfo[ClassID].insert(10059);
+            mSpellClassInfo[ClassID].insert(11416);
+            mSpellClassInfo[ClassID].insert(11417);
+            mSpellClassInfo[ClassID].insert(11418);
+            mSpellClassInfo[ClassID].insert(11419);
+            mSpellClassInfo[ClassID].insert(11420);
+            mSpellClassInfo[ClassID].insert(49358);
+            mSpellClassInfo[ClassID].insert(49361);
+            mSpellClassInfo[ClassID].insert(35715);
+            mSpellClassInfo[ClassID].insert(33690);
+            mSpellClassInfo[ClassID].insert(33691);
+            mSpellClassInfo[ClassID].insert(35717);
+            mSpellClassInfo[ClassID].insert(53140);
+            mSpellClassInfo[ClassID].insert(53142);
+            mSpellClassInfo[ClassID].insert(88342);
+            mSpellClassInfo[ClassID].insert(88344);
+            mSpellClassInfo[ClassID].insert(88345);
+            mSpellClassInfo[ClassID].insert(88346);
+        }
+
+        // Ancestral Focus
+        if (ClassID == CLASS_SHAMAN)
+            mSpellClassInfo[ClassID].insert(89920);
+
+        // Plate Mail skill
+        if (ClassID == CLASS_PALADIN || ClassID == CLASS_WARRIOR)
+            mSpellClassInfo[ClassID].insert(750);
+
+        // Mail skill
+        if (ClassID == CLASS_SHAMAN || ClassID == CLASS_HUNTER)
+            mSpellClassInfo[ClassID].insert(8737);
+
+        // Dual Wield
+        if (ClassID == CLASS_WARRIOR || ClassID == CLASS_HUNTER || ClassID == CLASS_ROGUE || ClassID == CLASS_DEATH_KNIGHT || ClassID == CLASS_MONK)
+            mSpellClassInfo[ClassID].insert(674);
+
+        // Natural Insight druid
+        if (ClassID == CLASS_DRUID)
+            mSpellClassInfo[ClassID].insert(112857);
+        
+        // Sinister Strike Enabler
+        if (ClassID == CLASS_ROGUE)
+            mSpellClassInfo[ClassID].insert(79327);
+
+        // Opening gameobject
+        if (ClassID == CLASS_MONK)
+        {
+            mSpellClassInfo[ClassID].insert(3365);
+            mSpellClassInfo[ClassID].insert(6247);
+            mSpellClassInfo[ClassID].insert(6477);
+            mSpellClassInfo[ClassID].insert(6478);
+            mSpellClassInfo[ClassID].insert(21651);
+            mSpellClassInfo[ClassID].insert(22810);
+            mSpellClassInfo[ClassID].insert(61437);
+            mSpellClassInfo[ClassID].insert(68398);
+            mSpellClassInfo[ClassID].insert(96220);
+        }
+
+        for (uint32 i = 0; i < sSkillLineAbilityStore.GetNumRows(); ++i)
+        {
+            SkillLineAbilityEntry const* skillLine = sSkillLineAbilityStore.LookupEntry(i);
+            if (!skillLine)
+                continue;
+
+            SpellInfo const* spellEntry = sSpellMgr->GetSpellInfo(skillLine->SpellID);
+            if (!spellEntry)
+                continue;
+
+            if (spellEntry->SpellLevel == 0)
+                continue;
+
+			if (skillLine->SkillLine != SkillClass[ClassID] || skillLine->AquireMethod != ABILITY_LEARNED_ON_GET_RACE_OR_CLASS_SKILL)
+                continue;
+
+			// See CGSpellBook::InitFutureSpells in client
+            if (spellEntry->Attributes & SPELL_ATTR0_TRADESPELL || spellEntry->Attributes & SPELL_ATTR0_HIDDEN_CLIENTSIDE
+                || spellEntry->AttributesEx8 & SPELL_ATTR8_UNK13 || spellEntry->AttributesEx4 & SPELL_ATTR4_UNK15)
+                continue;
+
+            if (sSpellMgr->IsTalent(spellEntry->Id))
+                continue;
+
+            mSpellClassInfo[ClassID].insert(spellEntry->Id);
+        }
+
+        for (uint32 i = 0; i < sSpecializationSpellsStore.GetNumRows(); ++i)
+        {
+            SpecializationSpellsEntry const* specializationInfo = sSpecializationSpellsStore.LookupEntry(i);
+            if (!specializationInfo)
+                continue;
+
+            ChrSpecializationEntry const* chrSpec = sChrSpecializationStore.LookupEntry(specializationInfo->SpecializationId);
+            if (!chrSpec)
+                continue;
+
+            mSpellClassInfo[chrSpec->classId].insert(specializationInfo->SpellId);
+        }
+    }
+}
+
+void SpellMgr::LoadTalentSpellInfo()
+{
+    for (uint32 i = 0; i < sTalentStore.GetNumRows(); i++)
+    {
+        TalentEntry const* talent = sTalentStore.LookupEntry(i);
+        if (!talent)
+            continue;
+
+        mTalentSpellInfo.insert(talent->SpellId);
+    }
+}

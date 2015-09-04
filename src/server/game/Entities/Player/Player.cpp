@@ -976,12 +976,12 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     if (!info)
     {
         TC_LOG_ERROR("entities.player", "Player::Create: Possible hacking-attempt: Account %u tried creating a character named '%s' with an invalid race/class pair (%u/%u) - refusing to do so.",
-                GetSession()->GetAccountId(), m_name.c_str(), createInfo->Race, createInfo->Class);
+            GetSession()->GetAccountId(), m_name.c_str(), createInfo->Race, createInfo->Class);
         return false;
     }
 
     for (uint8 i = 0; i < PLAYER_SLOTS_COUNT; i++)
-        m_items[i] = nullptr;
+        m_items[i] = NULL;
 
     Relocate(info->positionX, info->positionY, info->positionZ, info->orientation);
 
@@ -989,7 +989,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     if (!cEntry)
     {
         TC_LOG_ERROR("entities.player", "Player::Create: Possible hacking-attempt: Account %u tried creating a character named '%s' with an invalid character class (%u) - refusing to do so (wrong DBC-files?)",
-                GetSession()->GetAccountId(), m_name.c_str(), createInfo->Class);
+            GetSession()->GetAccountId(), m_name.c_str(), createInfo->Class);
         return false;
     }
 
@@ -1004,7 +1004,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     if (!IsValidGender(createInfo->Gender))
     {
         TC_LOG_ERROR("entities.player", "Player::Create: Possible hacking-attempt: Account %u tried creating a character named '%s' with an invalid gender (%u) - refusing to do so",
-                GetSession()->GetAccountId(), m_name.c_str(), createInfo->Gender);
+            GetSession()->GetAccountId(), m_name.c_str(), createInfo->Gender);
         return false;
     }
 
@@ -1021,6 +1021,12 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
         SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP_ATTACKABLE);
     }
 
+    SetFloatValue(UNIT_FIELD_MOD_CASTING_SPEED, 1.0f);
+    SetFloatValue(UNIT_FIELD_MOD_SPELL_HASTE, 1.0f);
+    SetFloatValue(UNIT_FIELD_MOD_HASTE, 1.0f);
+    SetFloatValue(UNIT_FIELD_MOD_HASTE_REGEN, 1.0f);
+    SetFloatValue(UNIT_FIELD_MOD_RANGED_HASTE, 1.0f);
+
     SetFlag(UNIT_FIELD_FLAGS2, UNIT_FLAG2_REGENERATE_POWER);
     SetFloatValue(UNIT_FIELD_HOVER_HEIGHT, 1.0f);            // default for players in 3.0.3
 
@@ -1028,9 +1034,9 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
 
     SetUInt32Value(PLAYER_FIELD_HAIR_COLOR_ID, (createInfo->Skin | (createInfo->Face << 8) | (createInfo->HairStyle << 16) | (createInfo->HairColor << 24)));
     SetUInt32Value(PLAYER_FIELD_REST_STATE, (createInfo->FacialHair |
-                                   (0x00 << 8) |
-                                   (0x00 << 16) |
-                                   (((GetSession()->IsARecruiter() || GetSession()->GetRecruiterId() != 0) ? REST_STATE_RAF_LINKED : REST_STATE_NOT_RAF_LINKED) << 24)));
+        (0x00 << 8) |
+        (0x00 << 16) |
+        (((GetSession()->IsARecruiter() || GetSession()->GetRecruiterId() != 0) ? REST_STATE_RAF_LINKED : REST_STATE_NOT_RAF_LINKED) << 24)));
     SetByteValue(PLAYER_FIELD_ARENA_FACTION, 0, createInfo->Gender);
     SetByteValue(PLAYER_FIELD_ARENA_FACTION, 3, 0);                     // BattlefieldArenaFaction (0 or 1)
 
@@ -1071,8 +1077,8 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     // start with every map explored
     if (sWorld->getBoolConfig(CONFIG_START_ALL_EXPLORED))
     {
-        for (uint8 i=0; i<PLAYER_EXPLORED_ZONES_SIZE; i++)
-            SetFlag(PLAYER_FIELD_EXPLORED_ZONES+i, 0xFFFFFFFF);
+        for (uint8 i = 0; i < PLAYER_EXPLORED_ZONES_SIZE; i++)
+            SetFlag(PLAYER_FIELD_EXPLORED_ZONES + i, 0xFFFFFFFF);
     }
 
     //Reputations if "StartAllReputation" is enabled, -- @todo Fix this in a better way
@@ -1119,7 +1125,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     }
 
     // Played time
-    m_Last_tick = time(nullptr);
+    m_Last_tick = time(NULL);
     m_Played_time[PLAYED_TIME_TOTAL] = 0;
     m_Played_time[PLAYED_TIME_LEVEL] = 0;
 
@@ -1128,6 +1134,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     InitTaxiNodesForLevel();
     InitGlyphsForLevel();
     InitTalentForLevel();
+    InitSpellForLevel();
     InitPrimaryProfessions();                               // to max set before any spell added
 
     // apply original stats mods before spell loading or item equipment that call before equip _RemoveStatsMods()
@@ -1178,12 +1185,12 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
             {
                 switch (iProto->Spells[0].SpellCategory)
                 {
-                    case SPELL_CATEGORY_FOOD:                                // food
-                        count = getClass() == CLASS_DEATH_KNIGHT ? 10 : 4;
-                        break;
-                    case SPELL_CATEGORY_DRINK:                                // drink
-                        count = 2;
-                        break;
+                case SPELL_CATEGORY_FOOD:                                // food
+                    count = getClass() == CLASS_DEATH_KNIGHT ? 10 : 4;
+                    break;
+                case SPELL_CATEGORY_DRINK:                                // drink
+                    count = 2;
+                    break;
                 }
                 if (iProto->GetMaxStackSize() < count)
                     count = iProto->GetMaxStackSize();
@@ -2087,7 +2094,7 @@ bool Player::BuildEnumData(PreparedQueryResult result, ByteBuffer* dataBuffer, B
             continue;
         }
 
-        SpellItemEnchantmentEntry const* enchant = nullptr;
+        SpellItemEnchantmentEntry const* enchant = NULL;
         uint32 enchants = GetUInt32ValueFromArray(equipment, visualbase + 1);
         for (uint8 enchantSlot = PERM_ENCHANTMENT_SLOT; enchantSlot <= TEMP_ENCHANTMENT_SLOT; ++enchantSlot)
         {
@@ -21196,14 +21203,14 @@ void Player::SendExplorationExperience(uint32 Area, uint32 Experience)
     GetSession()->SendPacket(&data);
 }
 
-void Player::SendDungeonDifficulty(bool IsInGroup)
+void Player::SendDungeonDifficulty()
 {
     WorldPacket data(SMSG_SET_DUNGEON_DIFFICULTY, 4);
     data << uint32(GetDungeonDifficulty());
     GetSession()->SendPacket(&data);
 }
 
-void Player::SendRaidDifficulty(bool IsInGroup, int32 forcedDifficulty)
+void Player::SendRaidDifficulty(int32 forcedDifficulty)
 {
     WorldPacket data(MSG_SET_RAID_DIFFICULTY, 4);
     data << uint32(forcedDifficulty == -1 ? GetRaidDifficulty() : forcedDifficulty);
@@ -24400,6 +24407,9 @@ void Player::SendInitialPacketsAfterAddToMap()
 
     CastSpell(this, 836, true);                             // LOGINEFFECT
 
+	if (getClass() == CLASS_MONK && GetSpecializationId(GetActiveSpec()) == SPEC_MONK_WINDWALKER)
+		AddAura(103985, this);
+
     // set some aura effects that send packet to player client after add player to map
     // SendMessageToSet not send it to player not it map, only for aura that not changed anything at re-apply
     // same auras state lost at far teleport, send it one more time in this case also
@@ -24423,6 +24433,7 @@ void Player::SendInitialPacketsAfterAddToMap()
     if (HasAuraType(SPELL_AURA_MOD_ROOT))
         SetRooted(true, true);
 
+	//SendCooldownAtLogin();
     SendAurasForTarget(this);
     SendEnchantmentDurations();                             // must be after add to map
     SendItemDurations();                                    // must be after add to map
@@ -24433,14 +24444,96 @@ void Player::SendInitialPacketsAfterAddToMap()
         if (GetMap()->GetDifficulty() != GetRaidDifficulty())
         {
             StoreRaidMapDifficulty();
-            SendRaidDifficulty(GetGroup() != nullptr, GetStoredRaidDifficulty());
+            SendRaidDifficulty(GetStoredRaidDifficulty());
         }
     }
     else if (GetRaidDifficulty() != GetStoredRaidDifficulty())
-        SendRaidDifficulty(GetGroup() != nullptr);
+        SendRaidDifficulty();
 
     m_battlePetMgr->SendBattlePetJournal();
     m_battlePetMgr->SendBattlePetJournalLock();
+
+    // Sending the pets that you have.
+    if (getClass() == CLASS_HUNTER)
+        SendPetsInSlots(GetSession()->GetPlayer());
+}
+
+void Player::SendPetsInSlots(Player* owner, uint64 guid, bool all, int64 show_num)
+{
+    uint32 ownerid = owner->GetGUIDLow();
+    m_free_slot = 0;
+    WorldPacket data_guids(SMSG_PET_GUIDS, 3 + (8 * GetSession()->m_petslist.size()));
+    ByteBuffer data_guids2;
+    ObjectGuid pet_guids;
+
+    if (all == true && show_num == -1)
+        data_guids.WriteBits(GetSession()->m_petslist.size(), 24); // This is for adding all Pets guid for the actual 5 first pets.
+    else if (all == true && show_num > -1)
+        data_guids.WriteBits(1, 24); // This is for adding 1 Pet guid for 1 actual pet.
+
+    ObjectGuid guid_zero = guid;
+    WorldPacket data(SMSG_STABLE_LIST, 200);
+
+    data.WriteGuidMask(guid_zero, 3, 0, 4, 7, 2, 1, 6, 5);
+    ByteBuffer data2((4 + 4 + 1 + 4 + 20 + 4 + 4)* uint32(GetSession()->m_petslist.size()));
+
+    data.WriteBits(uint32(GetSession()->m_petslist.size()), 19);
+    uint8 petNum = 0;
+    uint64 guid_new_pet;
+    for (PetSlotsList::iterator itr = GetSession()->m_petslist.begin(); itr != GetSession()->m_petslist.end(); ++itr)
+    {
+        guid_new_pet = itr->second.guid;
+        data.WriteBits(itr->second.name.length(), 8);
+        if (itr->second.slot < 5)
+        {
+            if (m_free_slot == itr->second.slot)
+                ++m_free_slot;
+        }
+        if (all == true)
+        {
+            if (show_num > -1)
+            {
+                if (uint8(show_num) == petNum)
+                {
+                    ObjectGuid guid2 = itr->second.guid;
+                    DataPetGuids(data_guids, data_guids2, guid2);
+                }
+            }
+            else
+            {
+                ObjectGuid guid2 = itr->second.guid;
+                DataPetGuids(data_guids, data_guids2, guid2);
+            }
+        }
+
+        data2 << uint32(itr->second.pettemplate);                       // creature_template
+        data2 << uint32(itr->second.level);                             // Level
+        data2 << uint8(itr->second.slottype);                           // 1 = current, 3 = in stable (any from 4, 5, ... create problems with proper show)
+        data2 << uint32(GUID_LOPART(itr->second.guid));                 // The PetGUIDLow
+        data2.WriteString(itr->second.name);                            // petname
+        data2 << uint32(itr->second.entry);                             // PetEntry
+        data2 << uint32(itr->second.slot);                              // petNum
+        ++petNum;
+    }
+
+    data.FlushBits();
+    data2.WriteGuidBytes(guid_zero, 3, 5, 7, 2, 0, 4, 1, 6);
+
+    data.append(data2);
+    if (all == true)
+    {
+        data_guids.FlushBits();
+        data_guids.append(data_guids2);
+        GetSession()->SendPacket(&data_guids); // Lets send this one first if "all" is true -> SMSG_PET_GUIDS.
+    }
+
+    GetSession()->SendPacket(&data); // now we can send this -> SMSG_STABLE_LIST.
+}
+
+void Player::DataPetGuids(WorldPacket &data_guids, ByteBuffer &data_guids2, ObjectGuid guid)
+{
+    data_guids.WriteGuidMask(guid, 1, 6, 0, 4, 5, 7, 2, 3);
+    data_guids2.WriteGuidBytes(guid, 5, 2, 3, 0, 6, 1, 4, 7);
 }
 
 void Player::SendUpdateToOutOfRangeGroupMembers()

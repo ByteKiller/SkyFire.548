@@ -62,7 +62,7 @@ void WorldSession::HandeSetTalentSpecialization(WorldPacket& recvData)
         
         _player->InitStatsForLevel(true);
         _player->UpdateMastery();
-        _player->InitSpellForLevel();
+        //_player->InitSpellForLevel();
     }
     _player->SaveToDB();
 }

@@ -40,6 +40,7 @@
 #include "World.h"
 #include "ObjectAccessor.h"
 #include "BattlegroundMgr.h"
+#include "BattlePay/BattlePay.h"
 #include "OutdoorPvPMgr.h"
 #include "MapManager.h"
 #include "SocialMgr.h"
@@ -97,7 +98,7 @@ bool WorldSessionFilter::Process(WorldPacket* packet)
 }
 
 /// WorldSession constructor
-WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale, uint32 recruiter, bool isARecruiter):
+WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale, uint32 recruiter, bool isARecruiter, bool hasBoost) :
     m_muteTime(mute_time),
     m_timeOutTime(0),
     AntiDOS(this),
@@ -106,6 +107,7 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     _security(sec),
     _accountId(id),
     m_expansion(expansion),
+    m_charBooster(new CharacterBooster(this)),
     _warden(NULL),
     _logoutTime(0),
     m_inQueue(false),
@@ -121,6 +123,7 @@ WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8
     _filterAddonMessages(false),
     recruiterId(recruiter),
     isRecruiter(isARecruiter),
+    m_hasBoost(hasBoost),
     timeLastWhoCommand(0),
     _RBACData(NULL)
 {
@@ -162,6 +165,9 @@ WorldSession::~WorldSession()
 
     delete _warden;
     delete _RBACData;
+    delete m_charBooster;
+    for (uint32 i = 0; i < m_petslist.size(); ++i)
+        delete &this->m_petslist[i];
 
     ///- empty incoming packet queue
     WorldPacket* packet = NULL;
@@ -293,6 +299,7 @@ bool WorldSession::Update(uint32 diff, PacketFilter& updater)
 {
     /// Update Timeout timer.
     UpdateTimeOutTime(diff);
+    m_charBooster->Update(diff);
 
     ///- Before we process anything:
     /// If necessary, kick the player from the character select screen

@@ -247,8 +247,8 @@ void WorldSession::HandleCharEnum(PreparedQueryResult result)
 
     // Sended before SMSG_CHAR_ENUM
     // must be procceded before BuildEnumData, because of unsetting bosted character guid
-    /*if (m_charBooster->GetCurrentAction() == CHARACTER_BOOST_APPLIED)
-        m_charBooster->HandleCharacterBoost();*/
+    if (m_charBooster->GetCurrentAction() == CHARACTER_BOOST_APPLIED)
+        m_charBooster->HandleCharacterBoost();
 
     if (result)
     {
@@ -299,8 +299,8 @@ void WorldSession::HandleCharEnum(PreparedQueryResult result)
     SendPacket(&data);
 
     // Sended after SMSG_CHAR_ENUM
-    //if (m_charBooster->GetCurrentAction() == CHARACTER_BOOST_ITEMS)
-    //    m_charBooster->HandleCharacterBoost();
+    if (m_charBooster->GetCurrentAction() == CHARACTER_BOOST_ITEMS)
+        m_charBooster->HandleCharacterBoost();
 }
 
 

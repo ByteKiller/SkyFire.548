@@ -1134,7 +1134,7 @@ bool Player::Create(uint32 guidlow, CharacterCreateInfo* createInfo)
     InitTaxiNodesForLevel();
     InitGlyphsForLevel();
     InitTalentForLevel();
-    InitSpellForLevel();
+    //InitSpellForLevel();
     InitPrimaryProfessions();
 
     // apply original stats mods before spell loading or item equipment that call before equip _RemoveStatsMods()
@@ -4544,6 +4544,111 @@ void Player::_SaveSpellCooldowns(SQLTransaction& trans)
         trans->Append(ss.str().c_str());
 }
 
+uint32 Player::GetNextResetTalentsCost() const
+{
+    // The first time reset costs 1 gold
+    if (GetTalentResetCost() < 1 * GOLD)
+        return 1 * GOLD;
+    // then 5 gold
+    else if (GetTalentResetCost() < 5 * GOLD)
+        return 5 * GOLD;
+    // After that it increases in increments of 5 gold
+    else if (GetTalentResetCost() < 10 * GOLD)
+        return 10 * GOLD;
+    else
+    {
+        uint64 months = (sWorld->GetGameTime() - GetTalentResetTime()) / MONTH;
+        if (months > 0)
+        {
+            // This cost will be reduced by a rate of 5 gold per month
+            int32 new_cost = int32(GetTalentResetCost() - 5 * GOLD*months);
+            // to a minimum of 10 gold.
+            return (new_cost < 10 * GOLD ? 10 * GOLD : new_cost);
+        }
+        else
+        {
+            // After that it increases in increments of 5 gold
+            int32 new_cost = GetTalentResetCost() + 5 * GOLD;
+            // until it hits a cap of 50 gold.
+            if (new_cost > 50 * GOLD)
+                new_cost = 50 * GOLD;
+            return new_cost;
+        }
+    }
+}
+
+bool Player::ResetTalents(bool no_cost)
+{
+    sScriptMgr->OnPlayerTalentsReset(this, no_cost);
+
+    // not need after this call
+    if (HasAtLoginFlag(AT_LOGIN_RESET_TALENTS))
+        RemoveAtLoginFlag(AT_LOGIN_RESET_TALENTS, true);
+
+    uint32 talentPointsForLevel = CalculateTalentsPoints();
+
+    if (!GetUsedTalentCount())
+    {
+        SetFreeTalentPoints(talentPointsForLevel);
+        return false;
+    }
+
+    uint32 cost = 0;
+
+    if (!no_cost && !sWorld->getBoolConfig(CONFIG_NO_RESET_TALENT_COST))
+    {
+        cost = GetNextResetTalentsCost();
+
+        if (!HasEnoughMoney(uint64(cost)))
+        {
+            SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
+            return false;
+        }
+    }
+
+    RemovePet(NULL, PET_SAVE_NOT_IN_SLOT, true);
+
+    for (auto itr : *GetTalentMap(GetActiveSpec()))
+    {
+        const SpellInfo* _spellEntry = sSpellMgr->GetSpellInfo(itr.first);
+        if (!_spellEntry)
+            continue;
+
+        removeSpell(itr.first, true);
+        // search for spells that the talent teaches and unlearn them
+        for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+            if (_spellEntry->Effects[i].TriggerSpell > 0 && _spellEntry->Effects[i].Effect == SPELL_EFFECT_LEARN_SPELL)
+                removeSpell(_spellEntry->Effects[i].TriggerSpell, true);
+        // if this talent rank can be found in the PlayerTalentMap, mark the talent as removed so it gets deleted
+        PlayerTalentMap::iterator plrTalent = GetTalentMap(GetActiveSpec())->find(itr.first);
+        if (plrTalent != GetTalentMap(GetActiveSpec())->end())
+            plrTalent->second->state = PLAYERSPELL_REMOVED;
+    }
+
+    SetFreeTalentPoints(talentPointsForLevel);
+    SetUsedTalentCount(0);
+    
+    SQLTransaction charTrans = CharacterDatabase.BeginTransaction();
+    SQLTransaction accountTrans = LoginDatabase.BeginTransaction();
+
+    _SaveTalents(charTrans);
+    _SaveSpells(charTrans, accountTrans);
+    CharacterDatabase.CommitTransaction(charTrans);
+    LoginDatabase.CommitTransaction(accountTrans);
+
+    if (!no_cost)
+    {
+        ModifyMoney(-(int64)cost);
+        UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TALENTS, cost);
+        UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_NUMBER_OF_TALENT_RESETS, 1);
+
+        SetTalentResetCost(cost);
+        SetTalentResetTime(time(NULL));
+    }
+
+    return true;
+}
+
 uint32 Player::GetNextResetSpecializationCost() const
 {
     // The first time reset costs 1 gold
@@ -4577,119 +4682,6 @@ uint32 Player::GetNextResetSpecializationCost() const
     }
 }
 
-uint32 Player::GetNextResetTalentsCost() const
-{
-    // The first time reset costs 1 gold
-    if (GetTalentResetCost() < 1*GOLD)
-        return 1*GOLD;
-    // then 5 gold
-    else if (GetTalentResetCost() < 5*GOLD)
-        return 5*GOLD;
-    // After that it increases in increments of 5 gold
-    else if (GetTalentResetCost() < 10*GOLD)
-        return 10*GOLD;
-    else
-    {
-        uint64 months = (sWorld->GetGameTime() - GetTalentResetTime())/MONTH;
-        if (months > 0)
-        {
-            // This cost will be reduced by a rate of 5 gold per month
-            int32 new_cost = int32(GetTalentResetCost() - 5*GOLD*months);
-            // to a minimum of 10 gold.
-            return (new_cost < 10*GOLD ? 10*GOLD : new_cost);
-        }
-        else
-        {
-            // After that it increases in increments of 5 gold
-            int32 new_cost = GetTalentResetCost() + 5*GOLD;
-            // until it hits a cap of 50 gold.
-            if (new_cost > 50*GOLD)
-                new_cost = 50*GOLD;
-            return new_cost;
-        }
-    }
-}
-
-bool Player::ResetTalents(bool noCost, bool resetTalents, bool resetSpecialization)
-{
-    sScriptMgr->OnPlayerTalentsReset(this, noCost);
-
-    // not need after this call
-    if (HasAtLoginFlag(AT_LOGIN_RESET_TALENTS))
-        RemoveAtLoginFlag(AT_LOGIN_RESET_TALENTS, true);
-
-    uint32 talentPointsForLevel = CalculateTalentsPoints();
-
-    if (!GetUsedTalentCount())
-    {
-        SetFreeTalentPoints(talentPointsForLevel);
-        return false;
-    }
-
-    uint32 cost = 0;
-
-    if (!noCost && !sWorld->getBoolConfig(CONFIG_NO_RESET_TALENT_COST))
-    {
-        cost = GetNextResetTalentsCost();
-
-        if (!HasEnoughMoney(uint64(cost)))
-        {
-            SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
-            return false;
-        }
-    }
-
-    RemovePet(nullptr, PET_SAVE_NOT_IN_SLOT, true);
-
-    for (auto itr : *GetTalentMap(GetActiveSpec()))
-    {
-        const SpellInfo* _spellEntry = sSpellMgr->GetSpellInfo(itr.first);
-        if (!_spellEntry)
-            continue;
-
-        removeSpell(itr.first, true);
-        // search for spells that the talent teaches and unlearn them
-        for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
-            if (_spellEntry->Effects[i].TriggerSpell > 0 && _spellEntry->Effects[i].Effect == SPELL_EFFECT_LEARN_SPELL)
-                removeSpell(_spellEntry->Effects[i].TriggerSpell, true);
-        // if this talent rank can be found in the PlayerTalentMap, mark the talent as removed so it gets deleted
-        PlayerTalentMap::iterator plrTalent = GetTalentMap(GetActiveSpec())->find(itr.first);
-        if (plrTalent != GetTalentMap(GetActiveSpec())->end())
-            plrTalent->second->state = PLAYERSPELL_REMOVED;
-    }
-
-    SetFreeTalentPoints(talentPointsForLevel);
-    SetUsedTalentCount(0);
-    
-    SQLTransaction charTrans = CharacterDatabase.BeginTransaction();
-    SQLTransaction accountTrans = LoginDatabase.BeginTransaction();
-
-    _SaveTalents(charTrans);
-    _SaveSpells(charTrans, accountTrans);
-    CharacterDatabase.CommitTransaction(charTrans);
-    LoginDatabase.CommitTransaction(accountTrans);
-
-    if (!noCost)
-    {
-        ModifyMoney(-(int64)cost);
-        UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TALENTS, cost);
-        UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_NUMBER_OF_TALENT_RESETS, 1);
-
-        SetTalentResetCost(cost);
-        SetTalentResetTime(time(nullptr));
-    }
-
-    return true;
-}
-
-void Player::SetSpecializationId(uint8 spec, uint32 id)
-{
-    _talentMgr->SpecInfo[spec].SpecializationId = id;
-
-    if (spec == GetActiveSpec())
-        SetUInt32Value(PLAYER_FIELD_CURRENT_SPEC_ID, id);
-}
-
 bool Player::RemoveTalent(uint32 talentId)
 {
     TalentEntry const* talent = sTalentStore.LookupEntry(talentId);
@@ -4710,16 +4702,61 @@ bool Player::RemoveTalent(uint32 talentId)
     if (itr != GetTalentMap(GetActiveSpec())->end())
         itr->second->state = PLAYERSPELL_REMOVED;
 
-    // Needs to be executed orthewise the talents will be screwedsx
-    SQLTransaction trans = CharacterDatabase.BeginTransaction();
-    SQLTransaction accountTrans = LoginDatabase.BeginTransaction();
+    uint32 talentPointsForLevel = CalculateTalentsPoints();
 
-    _SaveTalents(trans);
-    _SaveSpells(trans, accountTrans);
-    CharacterDatabase.CommitTransaction(trans);
+    SetFreeTalentPoints(GetFreeTalentPoints()+1);
+    SetUsedTalentCount(GetUsedTalentCount()-1);
+
+    // Needs to be executed orthewise the talents will be screwedsx
+    SQLTransaction charTrans = CharacterDatabase.BeginTransaction();
+    SQLTransaction accountTrans = LoginDatabase.BeginTransaction();
+    _SaveTalents(charTrans);
+    _SaveSpells(charTrans, accountTrans);
+    CharacterDatabase.CommitTransaction(charTrans);
+    LoginDatabase.CommitTransaction(accountTrans);
 
     SendTalentsInfoData();
     return true;
+}
+
+void Player::ResetSpec()
+{
+    uint32 cost = 0;
+
+    if (!sWorld->getBoolConfig(CONFIG_NO_RESET_TALENT_COST))
+    {
+        cost = GetNextResetSpecializationCost();
+
+        if (!HasEnoughMoney(uint64(cost)))
+        {
+            SendBuyError(BUY_ERR_NOT_ENOUGHT_MONEY, 0, 0, 0);
+            return;
+        }
+    }
+
+    if (GetSpecializationId(GetActiveSpec()) == 0)
+        return;
+
+    RemoveSpecializationSpells();
+    SetSpecializationId(GetActiveSpec(), 0);
+    //InitSpellForLevel();
+    UpdateMastery();
+    SendTalentsInfoData(false);
+
+    ModifyMoney(-(int64)cost);
+    UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TALENTS, cost);
+    UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_NUMBER_OF_TALENT_RESETS, 1);
+
+    SetSpecializationResetCost(cost);
+    SetSpecializationResetTime(time(NULL));
+}
+
+void Player::SetSpecializationId(uint8 spec, uint32 id)
+{
+    _talentMgr->SpecInfo[spec].SpecializationId = id;
+
+    if (spec == GetActiveSpec())
+        SetUInt32Value(PLAYER_FIELD_CURRENT_SPEC_ID, id);
 }
 
 Mail* Player::GetMail(uint32 id)
@@ -17676,45 +17713,60 @@ bool Player::isBeingLoaded() const
     return GetSession()->PlayerLoading();
 }
 
-void Player::InitSpellForLevel()
+void Player::RemoveSpecializationSpells()
 {
-    auto spellList = sSpellMgr->GetSpellClassList(getClass());
-    uint8 level = getLevel();
-    uint32 specializationId = GetSpecializationId(GetActiveSpec());
+    std::list<uint32> spellToRemove;
 
-    for (auto spellId : spellList)
+    for (auto itr : GetSpellMap())
     {
-        SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
-        if (!spell)
-            continue;
-
-        if (HasSpell(spellId))
-            continue;
-
-        if (!spell->SpecializationIdList.empty())
-        {
-            bool find = false;
-
-            for (auto itr : spell->SpecializationIdList)
-                if (itr == specializationId)
-                    find = true;
-
-            if (!find)
-                continue;
-        }
-
-        if (!IsSpellFitByClassAndRace(spellId))
-            continue;
-
-        if (spell->SpellLevel <= level)
-            learnSpell(spellId, false);
+        SpellInfo const* spell = sSpellMgr->GetSpellInfo(itr.first);
+        if (spell && !spell->SpecializationIdList.empty())
+            spellToRemove.push_back(itr.first);
     }
 
-
-    // Fix Pick Lock update at each level
-    if (HasSpell(1804) && getLevel() > 20)
-        SetSkill(921, GetSkillStep(921), (getLevel() * 5), (getLevel() * 5));
+    for (auto itr : spellToRemove)
+        removeSpell(itr);
 }
+
+//void Player::InitSpellForLevel()
+//{
+//    auto spellList = sSpellMgr->GetSpellClassList(getClass());
+//    uint8 level = getLevel();
+//    uint32 specializationId = GetSpecializationId(GetActiveSpec());
+//
+//    for (auto spellId : spellList)
+//    {
+//        SpellInfo const* spell = sSpellMgr->GetSpellInfo(spellId);
+//        if (!spell)
+//            continue;
+//
+//        if (HasSpell(spellId))
+//            continue;
+//
+//        if (!spell->SpecializationIdList.empty())
+//        {
+//            bool find = false;
+//
+//            for (auto itr : spell->SpecializationIdList)
+//                if (itr == specializationId)
+//                    find = true;
+//
+//            if (!find)
+//                continue;
+//        }
+//
+//        if (!IsSpellFitByClassAndRace(spellId))
+//            continue;
+//
+//        if (spell->SpellLevel <= level)
+//            learnSpell(spellId, false);
+//    }
+//
+//
+//    // Fix Pick Lock update at each level
+//    if (HasSpell(1804) && getLevel() > 20)
+//        SetSkill(921, GetSkillStep(921), (getLevel() * 5), (getLevel() * 5));
+//}
 
 bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult accountResult)
 {
@@ -18283,7 +18335,7 @@ bool Player::LoadFromDB(uint32 guid, SQLQueryHolder *holder, PreparedQueryResult
     InitTalentForLevel();
 	LearnDefaultSkills();
 	LearnCustomSpells();
-    InitSpellForLevel();
+    //InitSpellForLevel();
 
     // must be before inventory (some items required reputation check)
     m_reputationMgr->LoadFromDB(holder->GetPreparedResult(PLAYER_LOGIN_QUERY_LOAD_REPUTATION));
@@ -26944,34 +26996,19 @@ void Player::CompletedAchievement(AchievementEntry const* entry)
     m_achievementMgr->CompletedAchievement(entry, this);
 }
 
-bool Player::LearnTalent(uint16 talentId)
+bool Player::LearnTalent(uint32 talentId)
 {
-    TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
+    uint32 CurTalentPoints = GetFreeTalentPoints();
+    if (CurTalentPoints == 0)
+        return false;
 
+    TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
     if (!talentInfo)
         return false;
 
-    uint32 maxTalentRow = GetUInt32Value(PLAYER_FIELD_MAX_TALENT_TIERS);
-
-    // prevent learn talent for different class (cheating)
     if (talentInfo->playerClass != getClass())
         return false;
 
-    // check if we have enough talent points
-    if (talentInfo->Row > maxTalentRow)
-        return false;
-
-    // Check if player doesnt have any spell in selected collumn
-    for (uint32 i = 0; i < sTalentStore.GetNumRows(); i++)
-    {
-        if (TalentEntry const* talent = sTalentStore.LookupEntry(i))
-        {
-            if (talentInfo->Row == talent->Row && HasSpell(talent->SpellId))
-                return false;
-        }
-    }
-
-    // spell not set in talent.dbc
     uint32 spellid = talentInfo->SpellId;
     if (spellid == 0)
     {
@@ -26983,106 +27020,30 @@ bool Player::LearnTalent(uint16 talentId)
     if (HasSpell(spellid))
         return false;
 
-    if (!AddTalent(spellid, GetActiveSpec(), true))
-        return false;
+    // Check if players has already learn a talent for this rank
+    for (uint32 i = 0; i < sTalentStore.GetNumRows(); i++)
+    {
+        TalentEntry const* tInfo = sTalentStore.LookupEntry(i);
+        if (!tInfo)
+            continue;
 
+        if (tInfo->playerClass != getClass())
+            continue;
+
+        if (tInfo->Row == talentInfo->Row && HasSpell(tInfo->SpellId))
+        {
+            TC_LOG_ERROR("entities.player", "[Cheat] Player GUID %u try to learn talent %u, but he has already spell %u", GetGUIDLow(), talentInfo->SpellId, tInfo->SpellId);
+            return false;
+        }
+    }
+
+    // learn! (other talent ranks will unlearned at learning)
     learnSpell(spellid, false);
+    AddTalent(spellid, GetActiveSpec(), true);
+    CastPassiveTalentSpell(spellid);
 
     TC_LOG_INFO("misc", "TalentID: %u Spell: %u Spec: %u\n", talentId, spellid, GetActiveSpec());
     return true;
-}
-
-void Player::LearnPetTalent(uint64 petGuid, uint32 talentId, uint32 talentRank)
-{
-    Pet* pet = GetPet();
-
-    if (!pet)
-        return;
-
-    if (petGuid != pet->GetGUID())
-        return;
-
-    uint32 CurTalentPoints = pet->GetFreeTalentPoints();
-
-    if (CurTalentPoints == 0)
-        return;
-
-    if (talentRank >= MAX_PET_TALENT_RANK)
-        return;
-
-    TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
-
-    if (!talentInfo)
-        return;
-
-    //TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentInfo->TalentTab);
-
-    //if (!talentTabInfo)
-        return;
-
-    CreatureTemplate const* ci = pet->GetCreatureTemplate();
-
-    if (!ci)
-        return;
-
-    CreatureFamilyEntry const* pet_family = sCreatureFamilyStore.LookupEntry(ci->family);
-
-    if (!pet_family)
-        return;
-
-    if (pet_family->petTalentType < 0)                       // not hunter pet
-        return;
-
-    // prevent learn talent for different family (cheating)
-    /*if (!((1 << pet_family->petTalentType) & talentTabInfo->petTalentMask))
-        return;*/
-
-    // find current max talent rank (0~5)
-    uint8 curtalent_maxrank = 0; // 0 = not learned any rank
-    /*for (int8 rank = MAX_TALENT_RANK-1; rank >= 0; --rank)
-    {
-        if (talentInfo->RankID[rank] && pet->HasSpell(talentInfo->RankID[rank]))
-        {
-            curtalent_maxrank = (rank + 1);
-            break;
-        }
-    }*/
-
-    // we already have same or higher talent rank learned
-    if (curtalent_maxrank >= (talentRank + 1))
-        return;
-
-    // check if we have enough talent points
-    if (CurTalentPoints < (talentRank - curtalent_maxrank + 1))
-        return;
-
-    // Check if it requires another talent
-
-    // Find out how many points we have in this field
-    /*
-    // not have required min points spent in talent tree
-    if (spentPoints < (talentInfo->Row * MAX_PET_TALENT_RANK))
-        return;
-
-    // spell not set in talent.dbc
-    uint32 spellid = talentInfo->RankID[talentRank];
-    if (spellid == 0)
-    {
-        TC_LOG_ERROR("entities.player", "Talent.dbc have for talent: %u Rank: %u spell id = 0", talentId, talentRank);
-        return;
-    }
-
-    // already known
-    if (pet->HasSpell(spellid))
-        return;
-
-    // learn! (other talent ranks will unlearned at learning)
-    pet->learnSpell(spellid);
-    TC_LOG_INFO("entities.player", "PetTalentID: %u Rank: %u Spell: %u\n", talentId, talentRank, spellid);
-
-    // update free talent points
-    pet->SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
-    */
 }
 
 void Player::AddKnownCurrency(uint32 itemId)
@@ -27162,10 +27123,10 @@ bool Player::CanSeeSpellClickOn(Creature const* c) const
 void Player::BuildPlayerTalentsInfoData(WorldPacket* data)
 {
     size_t* wpos = new size_t[GetSpecsCount()];
-
-    *data << uint8(GetActiveSpec());                        // talent group index (0 or 1)
+    
+    *data << uint8(GetActiveSpec());
     data->WriteBits(GetSpecsCount(), 19);
-
+    
     for (int i = 0; i < GetSpecsCount(); i++)
     {
         wpos[i] = data->bitwpos();
@@ -27203,79 +27164,7 @@ void Player::BuildPlayerTalentsInfoData(WorldPacket* data)
         *data << uint32(GetSpecializationId(i));
     }
 
-    delete [] wpos;
-}
-
-void Player::BuildPetTalentsInfoData(WorldPacket* data)
-{
-    uint32 unspentTalentPoints = 0;
-    size_t pointsPos = data->wpos();
-    *data << uint32(unspentTalentPoints);                   // [PH], unspentTalentPoints
-
-    uint8 talentIdCount = 0;
-    size_t countPos = data->wpos();
-    *data << uint8(talentIdCount);                          // [PH], talentIdCount
-
-    Pet* pet = GetPet();
-    if (!pet)
-        return;
-
-    unspentTalentPoints = pet->GetFreeTalentPoints();
-
-    data->put<uint32>(pointsPos, unspentTalentPoints);      // put real points
-
-    CreatureTemplate const* ci = pet->GetCreatureTemplate();
-    if (!ci)
-        return;
-
-    CreatureFamilyEntry const* pet_family = sCreatureFamilyStore.LookupEntry(ci->family);
-    if (!pet_family || pet_family->petTalentType < 0)
-        return;
-        /*
-    for (uint32 talentTabId = 1; talentTabId < sTalentTabStore.GetNumRows(); ++talentTabId)
-    {
-        TalentTabEntry const* talentTabInfo = sTalentTabStore.LookupEntry(talentTabId);
-        if (!talentTabInfo)
-            continue;
-
-        if (!((1 << pet_family->petTalentType) & talentTabInfo->petTalentMask))
-            continue;
-
-        for (uint32 talentId = 0; talentId < sTalentStore.GetNumRows(); ++talentId)
-        {
-            TalentEntry const* talentInfo = sTalentStore.LookupEntry(talentId);
-            if (!talentInfo)
-                continue;
-
-            // skip another tab talents
-            if (talentInfo->TalentTab != talentTabId)
-                continue;
-
-            // find max talent rank (0~4)
-            int8 curtalent_maxrank = -1;
-            for (int8 rank = MAX_TALENT_RANK-1; rank >= 0; --rank)
-            {
-                if (talentInfo->RankID[rank] && pet->HasSpell(talentInfo->RankID[rank]))
-                {
-                    curtalent_maxrank = rank;
-                    break;
-                }
-            }
-
-            // not learned talent
-            if (curtalent_maxrank < 0)
-                continue;
-
-            *data << uint32(talentInfo->TalentID);          // Talent.dbc
-            *data << uint8(curtalent_maxrank);              // talentMaxRank (0-4)
-
-            ++talentIdCount;
-        }
-
-        data->put<uint8>(countPos, talentIdCount);          // put real count
-
-        break;
-    }*/
+    delete[] wpos;
 }
 
 void Player::SendTalentsInfoData(bool pet /*= false*/)
@@ -27846,7 +27735,7 @@ void Player::ActivateSpec(uint8 spec)
 
     SetUsedTalentCount(spentTalents);
     InitTalentForLevel();
-    InitSpellForLevel();
+    //InitSpellForLevel();
 
     {
         PreparedStatement* stmt = CharacterDatabase.GetPreparedStatement(CHAR_SEL_CHARACTER_ACTIONS_SPEC);
@@ -28585,12 +28474,12 @@ uint32 Player::GetQuestObjectiveCounter(uint32 objectiveId) const
     return 0;
 }
 
-void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::ExtraMovementStatusElement* extras /*= nullptr*/)
+void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::ExtraMovementStatusElement* extras /*= NULL*/)
 {
     MovementStatusElements const* sequence = GetMovementStatusElementsSequence(data.GetOpcode());
     if (!sequence)
     {
-        TC_LOG_ERROR("network", "Player::ReadMovementInfo: No movement sequence found for opcode %s", GetOpcodeNameForLogging(data.GetOpcode(), false).c_str());
+        TC_LOG_DEBUG("network", "Player::ReadMovementInfo: No movement sequence found for opcode %s", GetOpcodeNameForLogging(data.GetOpcode(), false).c_str());
         return;
     }
 
@@ -28600,12 +28489,13 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
     bool hasOrientation = false;
     bool hasTransportData = false;
     bool hasTransportTime2 = false;
-    bool hasTransportTime3 = false;
+    bool hasTransportVehicleId = false;
     bool hasPitch = false;
     bool hasFallData = false;
     bool hasFallDirection = false;
     bool hasSplineElevation = false;
     bool hasCounter = false;
+    bool hasMountDisplayId = false;
     uint32 forcesCount = 0u;
 
     ObjectGuid guid;
@@ -28617,193 +28507,211 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
 
         switch (element)
         {
-            case MSEHasGuidByte0:
-            case MSEHasGuidByte1:
-            case MSEHasGuidByte2:
-            case MSEHasGuidByte3:
-            case MSEHasGuidByte4:
-            case MSEHasGuidByte5:
-            case MSEHasGuidByte6:
-            case MSEHasGuidByte7:
-                guid[element - MSEHasGuidByte0] = data.ReadBit();
+        case MSEHasGuidByte0:
+        case MSEHasGuidByte1:
+        case MSEHasGuidByte2:
+        case MSEHasGuidByte3:
+        case MSEHasGuidByte4:
+        case MSEHasGuidByte5:
+        case MSEHasGuidByte6:
+        case MSEHasGuidByte7:
+            guid[element - MSEHasGuidByte0] = data.ReadBit();
+            break;
+        case MSEHasTransportGuidByte0:
+        case MSEHasTransportGuidByte1:
+        case MSEHasTransportGuidByte2:
+        case MSEHasTransportGuidByte3:
+        case MSEHasTransportGuidByte4:
+        case MSEHasTransportGuidByte5:
+        case MSEHasTransportGuidByte6:
+        case MSEHasTransportGuidByte7:
+            if (hasTransportData)
+                tguid[element - MSEHasTransportGuidByte0] = data.ReadBit();
+            break;
+        case MSEGuidByte0:
+        case MSEGuidByte1:
+        case MSEGuidByte2:
+        case MSEGuidByte3:
+        case MSEGuidByte4:
+        case MSEGuidByte5:
+        case MSEGuidByte6:
+        case MSEGuidByte7:
+            data.ReadByteSeq(guid[element - MSEGuidByte0]);
+            break;
+        case MSETransportGuidByte0:
+        case MSETransportGuidByte1:
+        case MSETransportGuidByte2:
+        case MSETransportGuidByte3:
+        case MSETransportGuidByte4:
+        case MSETransportGuidByte5:
+        case MSETransportGuidByte6:
+        case MSETransportGuidByte7:
+            if (hasTransportData)
+                data.ReadByteSeq(tguid[element - MSETransportGuidByte0]);
+            break;
+        case MSEHasMovementFlags:
+            hasMovementFlags = !data.ReadBit();
+            break;
+        case MSEHasMovementFlags2:
+            hasMovementFlags2 = !data.ReadBit();
+            break;
+        case MSEHasTimestamp:
+            hasTimestamp = !data.ReadBit();
+            break;
+        case MSEHasOrientation:
+            hasOrientation = !data.ReadBit();
+            break;
+        case MSEHasTransportData:
+            hasTransportData = data.ReadBit();
+            break;
+        case MSEHasTransportTime2:
+            if (hasTransportData)
+                hasTransportTime2 = data.ReadBit();
+            break;
+        case MSEHasTransportVehicleId:
+            if (hasTransportData)
+                hasTransportVehicleId = data.ReadBit();
+            break;
+        case MSEHasPitch:
+            hasPitch = !data.ReadBit();
+            break;
+        case MSEHasFallData:
+            hasFallData = data.ReadBit();
+            break;
+        case MSEHasFallDirection:
+            if (hasFallData)
+                hasFallDirection = data.ReadBit();
+            break;
+        case MSEHasSplineElevation:
+            hasSplineElevation = !data.ReadBit();
+            break;
+        case MSEHasSpline:
+            data.ReadBit();
+            break;
+        case MSEHasMountDisplayId:
+            hasMountDisplayId = !data.ReadBit();
+            break;
+        case MSEMountDisplayIdWithCheck: // Fallback here
+            if (!hasMountDisplayId)
                 break;
-            case MSEHasTransportGuidByte0:
-            case MSEHasTransportGuidByte1:
-            case MSEHasTransportGuidByte2:
-            case MSEHasTransportGuidByte3:
-            case MSEHasTransportGuidByte4:
-            case MSEHasTransportGuidByte5:
-            case MSEHasTransportGuidByte6:
-            case MSEHasTransportGuidByte7:
-                if (hasTransportData)
-                    tguid[element - MSEHasTransportGuidByte0] = data.ReadBit();
+        case MSEMountDisplayIdWithoutCheck:
+        {
+            uint32 mountDisplayId;
+            data >> mountDisplayId;
+            SetUInt32Value(UNIT_FIELD_MOUNT_DISPLAY_ID, mountDisplayId);
+            break;
+        }
+        case MSEMovementFlags:
+            if (hasMovementFlags)
+                mi->flags = data.ReadBits(30);
+            break;
+        case MSEMovementFlags2:
+            if (hasMovementFlags2)
+                mi->flags2 = data.ReadBits(13);
+            break;
+        case MSETimestamp:
+            if (hasTimestamp)
+                data >> mi->time;
+            break;
+        case MSEPositionX:
+            data >> mi->pos.m_positionX;
+            break;
+        case MSEPositionY:
+            data >> mi->pos.m_positionY;
+            break;
+        case MSEPositionZ:
+            data >> mi->pos.m_positionZ;
+            break;
+        case MSEOrientation:
+            if (hasOrientation)
+                mi->pos.SetOrientation(data.read<float>());
+            break;
+        case MSETransportPositionX:
+            if (hasTransportData)
+                data >> mi->transport.pos.m_positionX;
+            break;
+        case MSETransportPositionY:
+            if (hasTransportData)
+                data >> mi->transport.pos.m_positionY;
+            break;
+        case MSETransportPositionZ:
+            if (hasTransportData)
+                data >> mi->transport.pos.m_positionZ;
+            break;
+        case MSETransportOrientation:
+            if (hasTransportData)
+                mi->transport.pos.SetOrientation(data.read<float>());
+            break;
+        case MSETransportSeat:
+            if (hasTransportData)
+                data >> mi->transport.seat;
+            break;
+        case MSETransportTime:
+            if (hasTransportData)
+                data >> mi->transport.time;
+            break;
+        case MSETransportTime2:
+            if (hasTransportData && hasTransportTime2)
+                data >> mi->transport.time2;
+            break;
+        case MSETransportVehicleId:
+            if (hasTransportData && hasTransportVehicleId)
+                data >> mi->transport.vehicleId;
+            break;
+        case MSEPitch:
+            if (hasPitch)
+                mi->pitch = G3D::wrap(data.read<float>(), float(-M_PI), float(M_PI));
+            break;
+        case MSEFallTime:
+            if (hasFallData)
+                data >> mi->jump.fallTime;
+            break;
+        case MSEFallVerticalSpeed:
+            if (hasFallData)
+                data >> mi->jump.zspeed;
+            break;
+        case MSEFallCosAngle:
+            if (hasFallData && hasFallDirection)
+                data >> mi->jump.cosAngle;
+            break;
+        case MSEFallSinAngle:
+            if (hasFallData && hasFallDirection)
+                data >> mi->jump.sinAngle;
+            break;
+        case MSEFallHorizontalSpeed:
+            if (hasFallData && hasFallDirection)
+                data >> mi->jump.xyspeed;
+            break;
+        case MSESplineElevation:
+            if (hasSplineElevation)
+                data >> mi->splineElevation;
+            break;
+        case MSEForcesCount:
+            forcesCount = data.ReadBits(22);
+            break;
+        case MSEForces:
+            for (uint32 i = 0; i < forcesCount; i++)
+                data.read_skip<uint32>();
+            break;
+        case MSEHasCounter:
+            hasCounter = !data.ReadBit();
+            break;
+        case MSECounter:
+            if (!hasCounter) // Fallback here
                 break;
-            case MSEGuidByte0:
-            case MSEGuidByte1:
-            case MSEGuidByte2:
-            case MSEGuidByte3:
-            case MSEGuidByte4:
-            case MSEGuidByte5:
-            case MSEGuidByte6:
-            case MSEGuidByte7:
-                data.ReadByteSeq(guid[element - MSEGuidByte0]);
-                break;
-            case MSETransportGuidByte0:
-            case MSETransportGuidByte1:
-            case MSETransportGuidByte2:
-            case MSETransportGuidByte3:
-            case MSETransportGuidByte4:
-            case MSETransportGuidByte5:
-            case MSETransportGuidByte6:
-            case MSETransportGuidByte7:
-                if (hasTransportData)
-                    data.ReadByteSeq(tguid[element - MSETransportGuidByte0]);
-                break;
-            case MSEHasMovementFlags:
-                hasMovementFlags = !data.ReadBit();
-                break;
-            case MSEHasMovementFlags2:
-                hasMovementFlags2 = !data.ReadBit();
-                break;
-            case MSEHasTimestamp:
-                hasTimestamp = !data.ReadBit();
-                break;
-            case MSEHasOrientation:
-                hasOrientation = !data.ReadBit();
-                break;
-            case MSEHasTransportData:
-                hasTransportData = data.ReadBit();
-                break;
-            case MSEHasTransportTime2:
-                if (hasTransportData)
-                    hasTransportTime2 = data.ReadBit();
-                break;
-            case MSEHasTransportTime3:
-                if (hasTransportData)
-                    hasTransportTime3 = data.ReadBit();
-                break;
-            case MSEHasPitch:
-                hasPitch = !data.ReadBit();
-                break;
-            case MSEHasFallData:
-                hasFallData = data.ReadBit();
-                break;
-            case MSEHasFallDirection:
-                if (hasFallData)
-                    hasFallDirection = data.ReadBit();
-                break;
-            case MSEHasSplineElevation:
-                hasSplineElevation = !data.ReadBit();
-                break;
-            case MSEHasSpline:
-                data.ReadBit();
-                break;
-            case MSEMovementFlags:
-                if (hasMovementFlags)
-                    mi->flags = data.ReadBits(30);
-                break;
-            case MSEMovementFlags2:
-                if (hasMovementFlags2)
-                    mi->flags2 = data.ReadBits(13);
-                break;
-            case MSETimestamp:
-                if (hasTimestamp)
-                    data >> mi->time;
-                break;
-            case MSEPositionX:
-                data >> mi->pos.m_positionX;
-                break;
-            case MSEPositionY:
-                data >> mi->pos.m_positionY;
-                break;
-            case MSEPositionZ:
-                data >> mi->pos.m_positionZ;
-                break;
-            case MSEOrientation:
-                if (hasOrientation)
-                    mi->pos.SetOrientation(data.read<float>());
-                break;
-            case MSETransportPositionX:
-                if (hasTransportData)
-                    data >> mi->transport.pos.m_positionX;
-                break;
-            case MSETransportPositionY:
-                if (hasTransportData)
-                    data >> mi->transport.pos.m_positionY;
-                break;
-            case MSETransportPositionZ:
-                if (hasTransportData)
-                    data >> mi->transport.pos.m_positionZ;
-                break;
-            case MSETransportOrientation:
-                if (hasTransportData)
-                    mi->transport.pos.SetOrientation(data.read<float>());
-                break;
-            case MSETransportSeat:
-                if (hasTransportData)
-                    data >> mi->transport.seat;
-                break;
-            case MSETransportTime:
-                if (hasTransportData)
-                    data >> mi->transport.time;
-                break;
-            case MSETransportTime2:
-                if (hasTransportData && hasTransportTime2)
-                    data >> mi->transport.time2;
-                break;
-                break;
-            case MSEPitch:
-                if (hasPitch)
-                    mi->pitch = G3D::wrap(data.read<float>(), float(-M_PI), float(M_PI));
-                break;
-            case MSEFallTime:
-                if (hasFallData)
-                    data >> mi->jump.fallTime;
-                break;
-            case MSEFallVerticalSpeed:
-                if (hasFallData)
-                    data >> mi->jump.zspeed;
-                break;
-            case MSEFallCosAngle:
-                if (hasFallData && hasFallDirection)
-                    data >> mi->jump.cosAngle;
-                break;
-            case MSEFallSinAngle:
-                if (hasFallData && hasFallDirection)
-                    data >> mi->jump.sinAngle;
-                break;
-            case MSEFallHorizontalSpeed:
-                if (hasFallData && hasFallDirection)
-                    data >> mi->jump.xyspeed;
-                break;
-            case MSESplineElevation:
-                if (hasSplineElevation)
-                    data >> mi->splineElevation;
-                break;
-            case MSEForcesCount:
-                forcesCount = data.ReadBits(22);
-                break;
-            case MSEForces:
-                for (uint32 i = 0; i < forcesCount; i++)
-                    data.read_skip<uint32>();
-                break;
-            case MSEHasCounter:
-                hasCounter = !data.ReadBit();
-                break;
-            case MSECounter:
-                if (hasCounter)
-                    data.read_skip<uint32>();
-                break;
-            case MSEZeroBit:
-            case MSEOneBit:
-                data.ReadBit();
-                break;
-            case MSEExtraElement:
-                extras->ReadNextElement(data);
-                break;
-            default:
-                ASSERT(Movement::PrintInvalidSequenceElement(element, __FUNCTION__));
-                break;
+        case MSECount:
+            data.read_skip<uint32>();
+            break;
+        case MSEZeroBit:
+        case MSEOneBit:
+            data.ReadBit();
+            break;
+        case MSEExtraElement:
+            extras->ReadNextElement(data);
+            break;
+        default:
+            //ASSERT(Movement::PrintInvalidSequenceElement(element, __FUNCTION__));
+            break;
         }
     }
 
@@ -28812,26 +28720,26 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
 
     //! Anti-cheat checks. Please keep them in seperate if () blocks to maintain a clear overview.
     //! Might be subject to latency, so just remove improper flags.
-    #ifdef TRINITY_DEBUG
-    #define REMOVE_VIOLATING_FLAGS(check, maskToRemove) \
-    { \
-        if (check) \
+#ifdef TRINITY_DEBUG
+#define REMOVE_VIOLATING_FLAGS(check, maskToRemove) \
         { \
+        if (check) \
+                { \
             TC_LOG_DEBUG("entities.unit", "Player::ReadMovementInfo: Violation of MovementFlags found (%s). " \
                 "MovementFlags: %u, MovementFlags2: %u for player GUID: %u. Mask %u will be removed.", \
                 STRINGIZE(check), mi->GetMovementFlags(), mi->GetExtraMovementFlags(), GetGUIDLow(), maskToRemove); \
             mi->RemoveMovementFlag((maskToRemove)); \
-        } \
-    }
-    #else
-    #define REMOVE_VIOLATING_FLAGS(check, maskToRemove) \
+                } \
+        }
+#else
+#define REMOVE_VIOLATING_FLAGS(check, maskToRemove) \
         if (check) \
             mi->RemoveMovementFlag((maskToRemove));
-    #endif
+#endif
 
     /*! This must be a packet spoofing attempt. MOVEMENTFLAG_ROOT sent from the client is not valid
-        in conjunction with any of the moving movement flags such as MOVEMENTFLAG_FORWARD.
-        It will freeze clients that receive this player's movement info.
+    in conjunction with any of the moving movement flags such as MOVEMENTFLAG_FORWARD.
+    It will freeze clients that receive this player's movement info.
     */
 
     REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_ROOT),
@@ -28870,9 +28778,9 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
         MOVEMENTFLAG_FALLING_SLOW);
 
     /*! Cannot fly if no fly auras present. Exception is being a GM.
-        Note that we check for account level instead of Player::IsGameMaster() because in some
-        situations it may be feasable to use .gm fly on as a GM without having .gm on,
-        e.g. aerial combat.
+    Note that we check for account level instead of Player::IsGameMaster() because in some
+    situations it may be feasable to use .gm fly on as a GM without having .gm on,
+    e.g. aerial combat.
     */
 
     REMOVE_VIOLATING_FLAGS(mi->HasMovementFlag(MOVEMENTFLAG_FLYING | MOVEMENTFLAG_CAN_FLY) && ToPlayer()->GetSession()->GetSecurity() == SEC_PLAYER &&
@@ -28892,8 +28800,9 @@ void Player::ReadMovementInfo(WorldPacket& data, MovementInfo* mi, Movement::Ext
     if (hasSplineElevation)
         mi->AddMovementFlag(MOVEMENTFLAG_SPLINE_ELEVATION);
 
-    #undef REMOVE_VIOLATING_FLAGS
+#undef REMOVE_VIOLATING_FLAGS
 }
+
 void Player::SaveResearchDigsiteToDB(ResearchDigsite* digsite)
 {
     // DELETE FROM character_research_digsites WHERE guid = ? AND digsiteId = ?

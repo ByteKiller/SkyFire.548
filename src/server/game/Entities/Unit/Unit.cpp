@@ -16077,10 +16077,11 @@ void Unit::NearTeleportTo(float x, float y, float z, float orientation, bool cas
     }
 }
 
-void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusElement* extras /*= nullptr*/)
+void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusElement* extras /*= NULL*/)
 {
     MovementInfo const& mi = m_movementInfo;
 
+    bool hasMountDisplayId = GetUInt32Value(UNIT_FIELD_MOUNT_DISPLAY_ID) != 0;
     bool hasMovementFlags = GetUnitMovementFlags() != 0;
     bool hasMovementFlags2 = GetExtraUnitMovementFlags() != 0;
     bool hasTimestamp = true;
@@ -16089,7 +16090,7 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
     bool hasSpline = IsSplineEnabled();
 
     bool hasTransportTime2 = hasTransportData && m_movementInfo.transport.time2 != 0;
-    bool hasTransportTime3 = false;
+    bool hasTransportVehicleId = hasTransportData && m_movementInfo.transport.vehicleId != 0;
     bool hasPitch = HasUnitMovementFlag(MovementFlags(MOVEMENTFLAG_SWIMMING | MOVEMENTFLAG_FLYING)) || HasExtraUnitMovementFlag(MOVEMENTFLAG2_ALWAYS_ALLOW_PITCHING);
     bool hasFallDirection = HasUnitMovementFlag(MOVEMENTFLAG_FALLING);
     bool hasFallData = hasFallDirection || m_movementInfo.jump.fallTime != 0;
@@ -16098,7 +16099,7 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
     MovementStatusElements const* sequence = GetMovementStatusElementsSequence(data.GetOpcode());
     if (!sequence)
     {
-        TC_LOG_ERROR("network", "Unit::WriteMovementInfo: No movement sequence found for opcode %s", GetOpcodeNameForLogging(data.GetOpcode(), true).c_str());
+		TC_LOG_DEBUG("network", "Unit::WriteMovementInfo: No movement sequence found for opcode %s", GetOpcodeNameForLogging(data.GetOpcode(), true).c_str());
         return;
     }
 
@@ -16156,6 +16157,9 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
         case MSEHasCounter:
             data.WriteBit(!m_movementCounter);
             break;
+        case MSEHasMountDisplayId:
+            data.WriteBit(!hasMountDisplayId);
+            break;
         case MSEHasMovementFlags:
             data.WriteBit(!hasMovementFlags);
             break;
@@ -16175,9 +16179,9 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
             if (hasTransportData)
                 data.WriteBit(hasTransportTime2);
             break;
-        case MSEHasTransportTime3:
+        case MSEHasTransportVehicleId:
             if (hasTransportData)
-                data.WriteBit(hasTransportTime3);
+                data.WriteBit(hasTransportVehicleId);
             break;
         case MSEHasPitch:
             data.WriteBit(!hasPitch);
@@ -16194,6 +16198,12 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
             break;
         case MSEHasSpline:
             data.WriteBit(hasSpline);
+            break;
+        case MSEMountDisplayIdWithCheck: // Fallback here
+            if (!hasMountDisplayId) 
+                break;
+        case MSEMountDisplayIdWithoutCheck:
+            data << GetUInt32Value(UNIT_FIELD_MOUNT_DISPLAY_ID);
             break;
         case MSEMovementFlags:
             if (hasMovementFlags)
@@ -16248,6 +16258,10 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
             if (hasTransportData && hasTransportTime2)
                 data << mi.transport.time2;
             break;
+        case MSETransportVehicleId:
+            if (hasTransportData && hasTransportVehicleId)
+                data << mi.transport.vehicleId;
+            break;
         case MSEPitch:
             if (hasPitch)
                 data << mi.pitch;
@@ -16277,12 +16291,20 @@ void Unit::WriteMovementInfo(WorldPacket& data, Movement::ExtraMovementStatusEle
                 data << mi.splineElevation;
             break;
         case MSEForcesCount:
+            // data.WriteBits(forcesCount, 22);
             data.WriteBits(0, 22);
             break;
+        case MSEForces:
+            /* 
+            for (uint8 i = 0; i < forcesCount; ++i)
+                data << uint32(0); 
+            */            
+            break;
         case MSECounter:
-            if (m_movementCounter)
-                data << m_movementCounter;
-            m_movementCounter++;
+            if (!m_movementCounter)
+                break;
+        case MSECount:
+            data << m_movementCounter++;
             break;
         case MSEZeroBit:
             data.WriteBit(0);

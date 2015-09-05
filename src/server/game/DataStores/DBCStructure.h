@@ -720,7 +720,7 @@ struct ChrClassesEntry
 {
     uint32  ClassID;                                        // 0
     uint32  powerType;                                      // 1        m_DisplayPower
-                                                            // 2        m_petNameToken
+    // 2        m_petNameToken
     char* name;                                             // 3        m_name_lang
     //char*       nameFemale;                               // 4        m_name_female_lang
     //char*       nameNeutralGender;                        // 5        m_name_male_lang
@@ -731,12 +731,11 @@ struct ChrClassesEntry
     uint32 APPerStrenth;                                    // 10       Attack Power bonus per point of strength
     uint32 APPerAgility;                                    // 11       Attack Power bonus per point of agility
     uint32 RAPPerAgility;                                   // 12       Ranged Attack Power bonus per point of agility
-    //uint32 unk1                                           // 13       Pandaria
-    //uint32 unk1                                           // 14       Pandaria
-    //uint32 unk1                                           // 15       Pandaria
-    //uint32 unk1                                           // 16       Pandaria
-    //uint32 unk1                                           // 17       Pandaria
-
+    //uint32 defaultSpec                                    // 13       Pandaria
+    //uint32 createScreenFileDataID                         // 14       Pandaria
+    //uint32 selectScreenFileDataID                         // 15       Pandaria
+    //uint32 lowResScreenFileDataID                         // 16       Pandaria
+    //uint32 iconFileDataID                                 // 17       Pandaria
 };
 
 struct ChrRacesEntry

@@ -38,6 +38,7 @@ enum MovementStatusElements
     MSEHasGuidByte5,
     MSEHasGuidByte6,
     MSEHasGuidByte7,
+    MSEHasMountDisplayId,
     MSEHasMovementFlags,
     MSEHasMovementFlags2,
     MSEHasTimestamp,
@@ -52,7 +53,8 @@ enum MovementStatusElements
     MSEHasTransportGuidByte6,
     MSEHasTransportGuidByte7,
     MSEHasTransportTime2,
-    MSEHasTransportTime3,
+	MSEHasTransportTime3,
+    MSEHasTransportVehicleId,
     MSEHasPitch,
     MSEHasFallData,
     MSEHasFallDirection,
@@ -60,6 +62,7 @@ enum MovementStatusElements
     MSEHasSpline,
 
     MSEForces,
+    MSECount,
     MSECounter,
     MSEGuidByte0,
     MSEGuidByte1,
@@ -69,6 +72,8 @@ enum MovementStatusElements
     MSEGuidByte5,
     MSEGuidByte6,
     MSEGuidByte7,
+    MSEMountDisplayIdWithCheck,
+    MSEMountDisplayIdWithoutCheck,
     MSEMovementFlags,
     MSEMovementFlags2,
     MSETimestamp,
@@ -91,7 +96,8 @@ enum MovementStatusElements
     MSETransportSeat,
     MSETransportTime,
     MSETransportTime2,
-    MSETransportTime3,
+	MSETransportTime3,
+    MSETransportVehicleId,
     MSEPitch,
     MSEFallTime,
     MSEFallVerticalSpeed,
@@ -109,7 +115,10 @@ enum MovementStatusElements
     MSEExtraElement,    // Used to signalize reading into ExtraMovementStatusElement, element sequence inside it is declared as separate array
                         // Allowed internal elements are: GUID markers (not transport), MSEExtraFloat, MSEExtraInt8
     MSEExtraFloat,
+    MSEExtraFloat2,
     MSEExtraInt8,
+    MSEExtraInt32,
+    MSEExtra2Bits,
 };
 
 namespace Movement

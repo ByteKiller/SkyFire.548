@@ -1369,6 +1369,7 @@ class Player : public Unit, public GridObject<Player>
         void GiveLevel(uint8 level);
 
         void InitStatsForLevel(bool reapplyMods = false);
+        void RemoveSpecializationSpells();
 
         // .cheat command related
         bool GetCommandStatus(uint32 command) const { return _activeCheats & command; }
@@ -1838,7 +1839,6 @@ class Player : public Unit, public GridObject<Player>
         void LearnCustomSpells();
         void learnDefaultSpells();
         void LearnDefaultSkills();
-        void InitSpellForLevel();
         void LearnDefaultSkill(SkillRaceClassInfoEntry const* rcInfo);
         void learnQuestRewardedSpells();
         void learnQuestRewardedSpells(Quest const* quest);
@@ -1854,14 +1854,14 @@ class Player : public Unit, public GridObject<Player>
         void SetFreeTalentPoints(uint32 points) { _talentMgr->FreeTalentPoints = points; }
         uint32 GetUsedTalentCount() const { return _talentMgr->UsedTalentCount; }
         void SetUsedTalentCount(uint32 talents) { _talentMgr->UsedTalentCount = talents; }
-        uint32 GetTalentResetCost() const { return _talentMgr->ResetTalentsCost; }
+        uint32 GetTalentResetCost() const { return _talentMgr->ResetSpecializationCost; }
         uint32 GetSpecializationResetCost() const { return _talentMgr->ResetSpecializationCost; }
         void SetSpecializationResetCost(uint32 cost) { _talentMgr->ResetSpecializationCost = cost; }
         uint32 GetSpecializationResetTime() const { return _talentMgr->ResetSpecializationTime; }
         void SetSpecializationResetTime(time_t time_) { _talentMgr->ResetSpecializationTime = time_; }
-        void SetTalentResetCost(uint32 cost)  { _talentMgr->ResetTalentsCost = cost; }
-        uint32 GetTalentResetTime() const { return _talentMgr->ResetTalentsTime; }
-        void SetTalentResetTime(time_t time_)  { _talentMgr->ResetTalentsTime = time_; }
+        void SetTalentResetCost(uint32 cost)  { _talentMgr->ResetSpecializationCost = cost; }
+        uint32 GetTalentResetTime() const { return _talentMgr->ResetSpecializationTime; }
+        void SetTalentResetTime(time_t time_)  { _talentMgr->ResetSpecializationTime = time_; }
         uint8 GetActiveSpec() const { return _talentMgr->ActiveSpec; }
         void SetActiveSpec(uint8 spec){ _talentMgr->ActiveSpec = spec; }
         uint8 GetSpecsCount() const { return _talentMgr->SpecsCount; }
@@ -1872,23 +1872,24 @@ class Player : public Unit, public GridObject<Player>
         float GetMasterySpellCoefficient() const;
 
 
-        bool ResetTalents(bool noCost = false, bool resetTalents = true, bool resetSpecialization = true);
+        bool ResetTalents(bool no_cost = false);
         bool RemoveTalent(uint32 talentId);
 
         uint32 GetNextResetTalentsCost() const;
         uint32 GetNextResetSpecializationCost() const;
         void InitTalentForLevel();
+        void InitSpellForLevel();
         void BuildPlayerTalentsInfoData(WorldPacket* data);
-        void BuildPetTalentsInfoData(WorldPacket* data);
         void SendTalentsInfoData(bool pet = false);
-        bool LearnTalent(uint16 talentId);
-        void LearnPetTalent(uint64 petGuid, uint32 talentId, uint32 talentRank);
+        bool LearnTalent(uint32 talentId);
         bool AddTalent(uint32 spellId, uint8 spec, bool learning);
         bool HasTalent(uint32 spell_id, uint8 spec) const;
         uint32 CalculateTalentsPoints() const;
         void CastPassiveTalentSpell(uint32 spellId);
         void RemovePassiveTalentSpell(uint32 spellId);
         int32 CalculateMonkMeleeAttacks(float coeff, int32 APmultiplier);
+
+        void ResetSpec();
 
         // Dual Spec
         void UpdateSpecCount(uint8 count);
